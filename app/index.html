@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unnamed - Ascii Draw</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --canvas-bg: #121212;
+            --sidebar-bg: #1e1e1e;
+            --scrollbar-track: transparent;
+            /* 轨道透明，更现代 */
+            --scrollbar-thumb: #3f3f3f;
+            --scrollbar-thumb-hover: #555;
+            --scrollbar-border: #1e1e1e;
+            /* 侧边栏背景色，用于滑块边框 */
+            --scrollbar-size: 8px;
+            /* 侧边栏滚动条稍微细一点 */
+        }
+
+        /* 定义通用自定义滚动条类 */
+        .scrollbar-styled::-webkit-scrollbar {
+            width: var(--scrollbar-size);
+            height: var(--scrollbar-size);
+        }
+
+        .scrollbar-styled::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+        }
+
+        .scrollbar-styled::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border: 2px solid var(--scrollbar-border);
+            /* 这里的颜色要动态适配背景 */
+            border-radius: 10px;
+        }
+
+        .scrollbar-styled::-webkit-scrollbar-thumb:hover {
+            background: var(--scrollbar-thumb-hover);
+        }
+
+        .scrollbar-styled::-webkit-scrollbar-corner {
+            background-color: var(--canvas-bg);
+        }
+
+        /* 针对中间编辑区的特殊覆盖（因为背景色不同） */
+        section.scrollbar-styled {
+            --scrollbar-border: #121212;
+            /* 匹配编辑区背景 */
+            --scrollbar-size: 12px;
+            /* 编辑区滚动条大一点，好操作 */
+        }
+
+        body {
+            overflow: hidden;
+        }
+    </style>
+
+</head>
+
+<body class="h-full w-full bg-[#1a1a1a] text-gray-300 flex flex-col">
+
+    <header class="w-full h-auto flex-none border-b border-gray-700 bg-[#252525] p-2 overflow-hidden whitespace-nowrap">
+        <div class="flex items-center gap-2">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="folder-open" class="w-5 h-5"></i>
+            </button>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="save" class="w-5 h-5"></i>
+            </button>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="download" class="w-5 h-5"></i>
+            </button>
+            <div class="h-6 w-px bg-gray-600 mx-2"></div>
+            <button class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition">
+                <i data-lucide="mouse-pointer" class="w-5 h-5"></i>
+            </button>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="move" class="w-5 h-5"></i>
+            </button>
+            <div class="h-6 w-px bg-gray-600 mx-2"></div>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="square" class="w-5 h-5"></i>
+            </button>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="minus" class="w-5 h-5"></i>
+            </button>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="arrow-up-right" class="w-5 h-5"></i>
+            </button>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="type" class="w-5 h-5"></i>
+            </button>
+            <div class="h-6 w-px bg-gray-600 mx-2"></div>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="undo-2" class="w-5 h-5"></i>
+            </button>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="redo-2" class="w-5 h-5"></i>
+            </button>
+            <div class="h-6 w-px bg-gray-600 mx-2"></div>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">Settings</button>
+            <span class="text-gray-500 text-xs italic">...more tools will be hidden if overflow...</span>
+        </div>
+    </header>
+
+    <main class="w-full flex-1 flex overflow-hidden">
+
+        <aside
+            class="w-[200px] flex-none border-r border-gray-700 bg-[#1e1e1e] flex flex-col scrollbar-styled overflow-auto">
+            <div
+                class="sticky top-0 p-2 text-[10px] uppercase tracking-wider text-gray-500 font-bold bg-[#1e1e1e] border-b border-gray-800 z-10">
+                Layers</div>
+            <ul class="text-xs p-2 space-y-4 h-[1000px]">
+                <li class="flex items-center gap-2 text-blue-400 cursor-pointer"><i data-lucide="box"
+                        class="w-3 h-3"></i> Rect 1 Rect 1 Rect 1</li>
+                <li class="flex items-center gap-2 text-blue-400 cursor-pointer"><i data-lucide="box"
+                        class="w-3 h-3"></i> Rect 1</li>
+                <li class="flex items-center gap-2 text-blue-400 cursor-pointer"><i data-lucide="box"
+                        class="w-3 h-3"></i> Rect 1</li>
+            </ul>
+        </aside>
+
+        <section class="flex-1 bg-[#121212] relative scrollbar-styled overflow-auto">
+            <div id="canvas-container" class="relative bg-[#121212]" style="width: 2000px; height: 4000px;">
+                <pre>
+
+                    
+                    HHH
+                    III
+                </pre>
+            </div>
+        </section>
+
+        <aside
+            class="w-[200px] flex-none border-l border-gray-700 bg-[#1e1e1e] flex flex-col scrollbar-styled overflow-auto">
+            <div
+                class="sticky top-0 p-2 text-[10px] uppercase tracking-wider text-gray-500 font-bold bg-[#1e1e1e] border-b border-gray-800 z-10">
+                Props</div>
+            <div class="p-2 space-y-4 h-[1000px]">
+                <div>
+                    <label class="block text-[10px] text-gray-500 mb-1">X Pos</label>
+                    <input type="text" value="20" class="w-full bg-[#333] border border-gray-600 rounded px-1 text-xs">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-gray-500 mb-1">Y Pos</label>
+                    <input type="text" value="10" class="w-full bg-[#333] border border-gray-600 rounded px-1 text-xs">
+                </div>
+            </div>
+        </aside>
+
+    </main>
+
+
+
+    <footer
+        class="w-full h-auto flex-none border-t border-gray-700 bg-[#252525] px-3 py-1 overflow-hidden whitespace-nowrap text-xs text-gray-400">
+        <div class="flex justify-between items-center">
+            <div class="truncate">
+                <span>File: my-robot</span>
+                <span class="ml-4">Selection: None</span>
+            </div>
+            <div class="flex-none ml-4 font-mono">
+                UTF-8 | ASCII Mode | Saved at 2026-01-24 20:15:32
+            </div>
+        </div>
+    </footer>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
