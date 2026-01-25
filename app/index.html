@@ -9,6 +9,11 @@
     <script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @font-face {
+            font-family: "maple-mono";
+            src: url("MapleMono.woff2");
+        }
+
         :root {
             --canvas-bg: #121212;
             --sidebar-bg: #1e1e1e;
@@ -66,45 +71,49 @@
 
     <header class="w-full h-auto flex-none border-b border-gray-700 bg-[#252525] p-2 overflow-hidden whitespace-nowrap">
         <div class="flex items-center gap-2">
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Open File">
                 <i data-lucide="folder-open" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Save File">
                 <i data-lucide="save" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Download File">
                 <i data-lucide="download" class="w-5 h-5"></i>
             </button>
             <div class="h-6 w-px bg-gray-600 mx-2"></div>
-            <button class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition">
+            <button class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition"
+                title="Select">
                 <i data-lucide="mouse-pointer" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Move">
                 <i data-lucide="move" class="w-5 h-5"></i>
             </button>
             <div class="h-6 w-px bg-gray-600 mx-2"></div>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Rectangle">
                 <i data-lucide="square" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Line">
                 <i data-lucide="minus" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Arrow">
                 <i data-lucide="arrow-up-right" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Text">
                 <i data-lucide="type" class="w-5 h-5"></i>
             </button>
             <div class="h-6 w-px bg-gray-600 mx-2"></div>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Delete">
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+            </button>
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Undo">
                 <i data-lucide="undo-2" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Redo">
                 <i data-lucide="redo-2" class="w-5 h-5"></i>
             </button>
             <div class="h-6 w-px bg-gray-600 mx-2"></div>
             <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">Settings</button>
-            <span class="text-gray-500 text-xs italic">...more tools will be hidden if overflow...</span>
+            <span class="text-gray-500 text-xs mx-2">Unnamed - ASCII Draw v1.0</span>
         </div>
     </header>
 
@@ -127,11 +136,14 @@
 
         <section class="flex-1 bg-[#121212] relative scrollbar-styled overflow-auto">
             <div id="canvas-container" class="relative bg-[#121212]" style="width: 2000px; height: 4000px;">
-                <pre>
+                <pre style="font-family: maple-mono;">
 
-                    
-                    HHH
-                    III
+
+                    ───────────────────────────────┐
+         (\(\        (\(\    (\(\    (\(\    (\(\  │
+        (='.') ◀──▶ (='.')  (='.')  (='.')  (='.') │
+        O(_")")     O(_")") O(_")") O(_")") O(_")")│
+                    ───────────────────────────────┘
                 </pre>
             </div>
         </section>
