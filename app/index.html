@@ -6,8 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unnamed - Ascii Draw</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
+    <script src="https://unpkg.com/vue@3.5.27/dist/vue.global.js"></script>
     <style>
         @font-face {
             font-family: "maple-mono";
@@ -25,6 +26,14 @@
             /* 侧边栏背景色，用于滑块边框 */
             --scrollbar-size: 8px;
             /* 侧边栏滚动条稍微细一点 */
+
+            /* 必须与 JS 中的 CHAR_W, CHAR_H 保持绝对一致 */
+            --grid-w: 9.6px;
+            /* Maple Mono 16px 的近似宽度 */
+            --grid-h: 24px;
+            /* 行高 */
+            --grid-color: rgba(255, 255, 255, 0.05);
+            /* 暗灰色网格线 */
         }
 
         /* 定义通用自定义滚动条类 */
@@ -60,6 +69,27 @@
             /* 编辑区滚动条大一点，好操作 */
         }
 
+        /* 字符网格背景 */
+        #canvas-container {
+            background-image:
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: var(--grid-w) var(--grid-h);
+            background-attachment: local;
+            /* 随内容滚动 */
+        }
+
+        #ascii-container {
+            font-family: 'maple-mono';
+            font-size: 16px;
+            /* 目标字号 */
+            line-height: 24px;
+            /* 与 --grid-h 保持一致 */
+            letter-spacing: 0;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             overflow: hidden;
         }
@@ -67,7 +97,7 @@
 
 </head>
 
-<body class="h-full w-full bg-[#1a1a1a] text-gray-300 flex flex-col">
+<body id="app" class="h-full w-full bg-[#1a1a1a] text-gray-300 flex flex-col">
 
     <header class="w-full h-auto flex-none border-b border-gray-700 bg-[#252525] p-2 overflow-hidden whitespace-nowrap">
         <div class="flex items-center gap-2">
@@ -118,33 +148,30 @@
     </header>
 
     <main class="w-full flex-1 flex overflow-hidden">
-
         <aside
             class="w-[200px] flex-none border-r border-gray-700 bg-[#1e1e1e] flex flex-col scrollbar-styled overflow-auto">
             <div
                 class="sticky top-0 p-2 text-[10px] uppercase tracking-wider text-gray-500 font-bold bg-[#1e1e1e] border-b border-gray-800 z-10">
                 Layers</div>
-            <ul class="text-xs p-2 space-y-4 h-[1000px]">
-                <li class="flex items-center gap-2 text-blue-400 cursor-pointer"><i data-lucide="box"
-                        class="w-3 h-3"></i> Rect 1 Rect 1 Rect 1</li>
-                <li class="flex items-center gap-2 text-blue-400 cursor-pointer"><i data-lucide="box"
-                        class="w-3 h-3"></i> Rect 1</li>
-                <li class="flex items-center gap-2 text-blue-400 cursor-pointer"><i data-lucide="box"
-                        class="w-3 h-3"></i> Rect 1</li>
+            <ul class="text-xs p-2 space-y-1">
+                <li v-for="node in nodes" :key="node.id" @click="selectedNodeId = node.id"
+                    :class="['flex items-center gap-2 p-1 cursor-pointer rounded', selectedNodeId === node.id ? 'bg-blue-600 text-white' : 'hover:bg-gray-800']">
+                    <i data-lucide="box" class="w-3 h-3"></i> {{ node.name }}
+                </li>
             </ul>
         </aside>
 
-        <section class="flex-1 bg-[#121212] relative scrollbar-styled overflow-auto">
-            <div id="canvas-container" class="relative bg-[#121212]" style="width: 2000px; height: 4000px;">
-                <pre style="font-family: maple-mono;">
+        <section class="flex-1 bg-[#121212] relative scrollbar-styled overflow-auto" ref="scrollContainer">
+            <div id="canvas-container" class="relative bg-[#121212] cursor-default"
+                :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px' }" @mousedown="handleCanvasClick">
 
+                <pre id="ascii-container"
+                    class="absolute inset-0 pointer-events-none select-none text-white whitespace-pre">{{ screenOutput }}</pre>
 
-                    ───────────────────────────────┐
-         (\(\        (\(\    (\(\    (\(\    (\(\  │
-        (='.') ◀──▶ (='.')  (='.')  (='.')  (='.') │
-        O(_")")     O(_")") O(_")") O(_")") O(_")")│
-                    ───────────────────────────────┘
-                </pre>
+                <div v-if="selectedNode"
+                    class="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none transition-all duration-75"
+                    :style="selectionStyle">
+                </div>
             </div>
         </section>
 
@@ -164,26 +191,21 @@
                 </div>
             </div>
         </aside>
-
     </main>
-
-
 
     <footer
         class="w-full h-auto flex-none border-t border-gray-700 bg-[#252525] px-3 py-1 overflow-hidden whitespace-nowrap text-xs text-gray-400">
         <div class="flex justify-between items-center">
             <div class="truncate">
-                <span>File: my-robot</span>
-                <span class="ml-4">Selection: None</span>
+                <span>Selection: {{ selectedNode ? selectedNode.name : 'None' }}</span>
             </div>
             <div class="flex-none ml-4 font-mono">
-                UTF-8 | ASCII Mode | Saved at 2026-01-24 20:15:32
+                <span>Grid: {{ currentGrid.x }}, {{ currentGrid.y }}</span> | ASCII Mode | Saved at 2026-01-24 20:15:32
             </div>
         </div>
     </footer>
-    <script>
-        lucide.createIcons();
-    </script>
+
+    <script src="main.js"></script>
 </body>
 
 </html>
