@@ -69,6 +69,7 @@ const CHAR_TABLE = {
     "3322": "╬", // 竖双横粗 -> 升级为双线交叉
     "2233": "╬", // 竖粗横双 -> 升级为双线交叉
     "0322": "╦", // 顶无, 下双, 左右粗 -> 升级为双线 T 字
+    "0233": "╦", // 顶无, 下粗, 左右双
     "3022": "╩",
     "3302": "╠",
     "3320": "╣",
@@ -90,7 +91,37 @@ function merge(newChar, existingChar) {
     const r = Math.max(d1.r, d2.r);
     const key = `${t}${b}${l}${r}`;
     const override = CHAR_TABLE[key];
-    console.log(`Merging '${newChar}' with '${existingChar}' => '${override}', key=${key}`);
+    console.log(`Merge '${newChar}' with '${existingChar}' => '${override}', key=${key}`);
+    return override || newChar;
+}
+
+/**
+ * char: 当前要画的边框字符
+ * existing: 缓冲区已有的字符
+ * side: 'top' | 'bottom' | 'left' | 'right' | 'corner' (告知是哪条边)
+ */
+function mergeOpaque(newChar, existing, side) {
+    if (existing === ' ') return newChar;
+
+    const d1 = DIR_MAP[newChar] || { t: 0, b: 0, l: 0, r: 0 };
+    const d2 = DIR_MAP[existing] || { t: 0, b: 0, l: 0, r: 0 };
+
+    // 核心逻辑：只保留朝向“外部”的连线
+    // 如果是左边界，就要切断底层字符向右(r)的连接
+    let t = Math.max(d1.t, d2.t);
+    let b = Math.max(d1.b, d2.b);
+    let l = Math.max(d1.l, d2.l);
+    let r = Math.max(d1.r, d2.r);
+
+    if (side === 'left') r = 0;   // 左边框切断向右的线
+    if (side === 'right') l = 0;  // 右边框切断向左的线
+    if (side === 'top') b = 0;    // 上边框切断向下的线
+    if (side === 'bottom') t = 0; // 下边框切断向上的线
+    // 角点 corner 暂不处理或根据具体位置切断两个方向
+
+    const key = `${t}${b}${l}${r}`;
+    const override = CHAR_TABLE[key];
+    console.log(`Merge opaque '${newChar}' with '${existing}' => '${override}', key=${key}`);
     return override || newChar;
 }
 
@@ -142,36 +173,47 @@ class Rectangle extends Shape {
 
     draw(buffer) {
         const charset = CHAR_STYLES[this.style];
-
         for (let i = 0; i < this.h; i++) {
             for (let j = 0; j < this.w; j++) {
                 const ty = this.y + i;
                 const tx = this.x + j;
                 if (ty < 0 || ty >= ROWS || tx < 0 || tx >= COLS) continue;
 
-                // 判断是否是边缘：
                 const isTop = i === 0;
                 const isBottom = i === this.h - 1;
                 const isLeft = j === 0;
                 const isRight = j === this.w - 1;
                 const isEdge = isTop || isBottom || isLeft || isRight;
 
-                // 如果是透明模式且不是边缘，则跳过不绘制（不改写 buffer）：
-                if (this.transparent && !isEdge) {
+                // --- 内部处理 ---
+                if (!isEdge) {
+                    if (!this.transparent) {
+                        buffer[ty][tx] = ' '; // 不透明则直接覆盖背景
+                    }
                     continue;
                 }
 
+                // --- 边缘处理 ---
                 let char = ' ';
-                if (isTop && isLeft) char = charset.tl;
-                else if (isTop && isRight) char = charset.tr;
-                else if (isBottom && isLeft) char = charset.bl;
-                else if (isBottom && isRight) char = charset.br;
-                else if (isTop || isBottom) char = charset.h;
-                else if (isLeft || isRight) char = charset.v;
+                let side = '';
+                if (isTop && isLeft) { char = charset.tl; side = 'corner'; }
+                else if (isTop && isRight) { char = charset.tr; side = 'corner'; }
+                else if (isBottom && isLeft) { char = charset.bl; side = 'corner'; }
+                else if (isBottom && isRight) { char = charset.br; side = 'corner'; }
+                else if (isTop) { char = charset.h; side = 'top'; }
+                else if (isBottom) { char = charset.h; side = 'bottom'; }
+                else if (isLeft) { char = charset.v; side = 'left'; }
+                else if (isRight) { char = charset.v; side = 'right'; }
 
-                // 智能交叉融合：感知底层字符
                 const existing = buffer[ty][tx];
-                buffer[ty][tx] = merge(char, existing);
+
+                if (this.transparent || !side) {
+                    // 透明模式：普通的增强融合 或者 角点：
+                    buffer[ty][tx] = merge(char, existing);
+                } else {
+                    // 不透明模式：边线切断：
+                    buffer[ty][tx] = mergeOpaque(char, existing, side);
+                }
             }
         }
     }
@@ -246,14 +288,15 @@ createApp({
 
         // 使用类实例初始化节点
         const nodes = ref([
-            new Rectangle(10, 5, 30, 6),
+            new Rectangle(10, 5, 30, 11),
             new Rectangle(17, 8, 30, 12),
-            new Rectangle(27, 3, 30, 22),
+            new Rectangle(27, 3, 30, 12),
             new Line(5, 5, 5, 12),   // 垂直线
             new Line(40, 20, 60, 20) // 水平线
         ]);
         nodes.value[1].style = 'bold';
         nodes.value[2].style = 'double';
+        nodes.value[2].transparent = false;
 
         // 计算属性：当前选中的节点对象
         const selectedNode = computed(() =>
