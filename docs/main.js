@@ -179,9 +179,11 @@ class Rectangle extends Shape {
     // 在 Rectangle 类中添加处理文本的方法
     layoutText() {
         if (!this.text) return [];
+        // 如果没有边框，填充为 0；否则为 2（左右或上下之和）
+        const padding = this.style === 'none' ? 0 : 2;
+        const maxWidth = this.w - padding;
+        const maxHeight = this.h - padding;
 
-        const maxWidth = this.w - 2; // 除去左右边框
-        const maxHeight = this.h - 2; // 除去上下边框
         if (maxWidth <= 0 || maxHeight <= 0) return [];
 
         let lines = [];
@@ -191,19 +193,18 @@ class Rectangle extends Shape {
             if (!this.wrap || segment.length <= maxWidth) {
                 lines.push(segment.slice(0, maxWidth));
             } else {
-                // 自动折行逻辑
                 for (let i = 0; i < segment.length; i += maxWidth) {
                     lines.push(segment.slice(i, i + maxWidth));
                 }
             }
         });
-
-        // 截断超出高度的部分
         return lines.slice(0, maxHeight);
     }
-
     draw(buffer) {
-        const charset = CHAR_STYLES[this.style];
+        const hasBorder = this.style !== 'none';
+        const charset = hasBorder ? CHAR_STYLES[this.style] : null;
+
+        // 背景与边框绘制
         for (let i = 0; i < this.h; i++) {
             for (let j = 0; j < this.w; j++) {
                 const ty = this.y + i;
@@ -216,15 +217,15 @@ class Rectangle extends Shape {
                 const isRight = j === this.w - 1;
                 const isEdge = isTop || isBottom || isLeft || isRight;
 
-                // --- 内部处理 ---
-                if (!isEdge) {
+                // 处理背景填充 (如果不透明且没有边框，或是透明矩形的内部)
+                if (!isEdge || !hasBorder) {
                     if (!this.transparent) {
-                        buffer[ty][tx] = ' '; // 不透明则直接覆盖背景
+                        buffer[ty][tx] = ' ';
                     }
                     continue;
                 }
 
-                // --- 边缘处理 ---
+                // 只有 hasBorder 时才会走到这里的边框融合逻辑
                 let char = ' ';
                 let side = '';
                 if (isTop && isLeft) { char = charset.tl; side = 'corner'; }
@@ -237,44 +238,48 @@ class Rectangle extends Shape {
                 else if (isRight) { char = charset.v; side = 'right'; }
 
                 const existing = buffer[ty][tx];
-
-                if (this.transparent || !side) {
-                    // 透明模式：普通的增强融合 或者 角点：
+                if (this.transparent || side === 'corner') {
                     buffer[ty][tx] = merge(char, existing);
                 } else {
-                    // 不透明模式：边线切断：
                     buffer[ty][tx] = mergeOpaque(char, existing, side);
                 }
             }
         }
 
-        // --- 文本绘制逻辑 ---
+        // 文本绘制
         const lines = this.layoutText();
         if (lines.length === 0) return;
 
-        // 计算 Y 轴起始偏移
-        let startY = 1; // 默认 top
+        // 无边框时起始位置为 0，有边框时起始位置为 1
+        const offset = hasBorder ? 1 : 0;
+        const availableW = hasBorder ? this.w - 2 : this.w;
+        const availableH = hasBorder ? this.h - 2 : this.h;
+
+        // 计算 Y 轴起始位置 (相对于 this.y)
+        let startY = offset;
         if (this.alignY === 'center') {
-            startY = Math.max(1, Math.floor((this.h - lines.length) / 2));
+            startY = offset + Math.floor((availableH - lines.length) / 2);
         } else if (this.alignY === 'bottom') {
-            startY = Math.max(1, this.h - lines.length - 1);
+            startY = offset + (availableH - lines.length);
         }
 
         lines.forEach((line, index) => {
             const row = this.y + startY + index;
-            if (row <= this.y || row >= this.y + this.h - 1) return; // 安全检查
+            // 确保文字在矩形垂直边界内
+            if (row < this.y + offset || row >= this.y + offset + availableH) return;
 
-            // 计算 X 轴起始偏移
-            let startX = 1; // 默认 left
+            // 计算 X 轴起始位置 (相对于 this.x)
+            let startX = offset;
             if (this.alignX === 'center') {
-                startX = Math.max(1, Math.floor((this.w - line.length) / 2));
+                startX = offset + Math.floor((availableW - line.length) / 2);
             } else if (this.alignX === 'right') {
-                startX = Math.max(1, this.w - line.length - 1);
+                startX = offset + (availableW - line.length);
             }
 
             for (let c = 0; c < line.length; c++) {
                 const col = this.x + startX + c;
-                if (col <= this.x || col >= this.x + this.w - 1) continue; // 安全检查
+                // 确保文字在矩形水平边界内
+                if (col < this.x + offset || col >= this.x + offset + availableW) continue;
 
                 if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
                     buffer[row][col] = line[c];
@@ -357,6 +362,7 @@ createApp({
             new Rectangle(17, 8, 30, 12),
             new Rectangle(27, 3, 30, 12),
             new Rectangle(62, 3, 29, 9),
+            new Rectangle(62, 13, 29, 9),
             new Line(5, 5, 5, 12),   // 垂直线
             new Line(40, 20, 60, 20) // 水平线
         ]);
@@ -364,6 +370,10 @@ createApp({
         nodes.value[2].style = 'double';
         nodes.value[2].transparent = false;
         nodes.value[3].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
+        nodes.value[4].style = 'none';
+        nodes.value[4].alignX = 'left';
+        nodes.value[4].alignY = 'top';
+        nodes.value[4].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
 
         // 计算属性：当前选中的节点对象
         const selectedNode = computed(() =>
