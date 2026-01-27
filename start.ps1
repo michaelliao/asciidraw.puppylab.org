@@ -1,6 +1,6 @@
 # Script for powershell to start a local server and open a browser preview
 
-$AppDir = "./app"
+$AppDir = "./docs"
 
 Set-Location $AppDir
 
