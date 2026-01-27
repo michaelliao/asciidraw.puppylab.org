@@ -161,6 +161,11 @@ class Rectangle extends Shape {
         this.w = w;
         this.h = h;
         this.transparent = transparent;
+        // 文本相关属性
+        this.text = "";
+        this.alignX = 'center'; // 'left', 'center', 'right'
+        this.alignY = 'center'; // 'top', 'center', 'bottom'
+        this.wrap = true;       // 是否自动折行
     }
 
     isHit(gx, gy) {
@@ -169,6 +174,32 @@ class Rectangle extends Shape {
 
     getBounds() {
         return { x: this.x, y: this.y, w: this.w, h: this.h };
+    }
+
+    // 在 Rectangle 类中添加处理文本的方法
+    layoutText() {
+        if (!this.text) return [];
+
+        const maxWidth = this.w - 2; // 除去左右边框
+        const maxHeight = this.h - 2; // 除去上下边框
+        if (maxWidth <= 0 || maxHeight <= 0) return [];
+
+        let lines = [];
+        const rawSegments = this.text.split('\n');
+
+        rawSegments.forEach(segment => {
+            if (!this.wrap || segment.length <= maxWidth) {
+                lines.push(segment.slice(0, maxWidth));
+            } else {
+                // 自动折行逻辑
+                for (let i = 0; i < segment.length; i += maxWidth) {
+                    lines.push(segment.slice(i, i + maxWidth));
+                }
+            }
+        });
+
+        // 截断超出高度的部分
+        return lines.slice(0, maxHeight);
     }
 
     draw(buffer) {
@@ -216,6 +247,40 @@ class Rectangle extends Shape {
                 }
             }
         }
+
+        // --- 文本绘制逻辑 ---
+        const lines = this.layoutText();
+        if (lines.length === 0) return;
+
+        // 计算 Y 轴起始偏移
+        let startY = 1; // 默认 top
+        if (this.alignY === 'center') {
+            startY = Math.max(1, Math.floor((this.h - lines.length) / 2));
+        } else if (this.alignY === 'bottom') {
+            startY = Math.max(1, this.h - lines.length - 1);
+        }
+
+        lines.forEach((line, index) => {
+            const row = this.y + startY + index;
+            if (row <= this.y || row >= this.y + this.h - 1) return; // 安全检查
+
+            // 计算 X 轴起始偏移
+            let startX = 1; // 默认 left
+            if (this.alignX === 'center') {
+                startX = Math.max(1, Math.floor((this.w - line.length) / 2));
+            } else if (this.alignX === 'right') {
+                startX = Math.max(1, this.w - line.length - 1);
+            }
+
+            for (let c = 0; c < line.length; c++) {
+                const col = this.x + startX + c;
+                if (col <= this.x || col >= this.x + this.w - 1) continue; // 安全检查
+
+                if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
+                    buffer[row][col] = line[c];
+                }
+            }
+        });
     }
 }
 
@@ -291,12 +356,14 @@ createApp({
             new Rectangle(10, 5, 30, 11),
             new Rectangle(17, 8, 30, 12),
             new Rectangle(27, 3, 30, 12),
+            new Rectangle(62, 3, 29, 9),
             new Line(5, 5, 5, 12),   // 垂直线
             new Line(40, 20, 60, 20) // 水平线
         ]);
         nodes.value[1].style = 'bold';
         nodes.value[2].style = 'double';
         nodes.value[2].transparent = false;
+        nodes.value[3].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
 
         // 计算属性：当前选中的节点对象
         const selectedNode = computed(() =>
