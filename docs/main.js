@@ -403,6 +403,36 @@ createApp({
             return buffer.map(row => row.join('')).join('\n');
         });
 
+        const handlePositions = computed(() => {
+            const n = selectedNode.value;
+            if (!n || n.type !== 'Line') return [];
+
+            const bounds = n.getBounds();
+            const halfW = config.charW / 2;
+            const halfH = config.charH / 2;
+
+            // 计算相对于 selection-box 左上角的偏移，并加上半个字符的偏移量
+            return [
+                {
+                    left: (n.x - bounds.x) * config.charW + halfW + 'px',
+                    top: (n.y - bounds.y) * config.charH + halfH + 'px'
+                },
+                {
+                    left: (n.x2 - bounds.x) * config.charW + halfW + 'px',
+                    top: (n.y2 - bounds.y) * config.charH + halfH + 'px'
+                }
+            ];
+        });
+
+        const handleResizeStart = (e, handleType) => {
+            // 阻止默认行为（防止拖拽文字等）
+            e.preventDefault();
+
+            console.log(`Started resizing/moving handle: ${handleType}`);
+
+            // 这里未来会记录初始位置，并挂载 window.onmousemove
+        };
+
         // 处理点击选中
         const handleCanvasClick = (e) => {
             const rect = e.currentTarget.getBoundingClientRect();
@@ -445,7 +475,8 @@ createApp({
 
         return {
             nodes, canvasWidth, canvasHeight, screenOutput,
-            selectedNodeId, selectedNode, selectionStyle,
+            selectedNodeId, selectedNode, selectionStyle, config,
+            handlePositions,
             handleCanvasClick, currentGrid
         };
     }

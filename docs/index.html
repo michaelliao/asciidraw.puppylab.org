@@ -93,6 +93,85 @@
         body {
             overflow: hidden;
         }
+
+        .selection-box {
+            position: absolute;
+            border: 1px solid #3b82f6;
+            pointer-events: none;
+            /* 框本身不挡点击 */
+            z-index: 9999;
+        }
+
+        .handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: white;
+            border: 1px solid #3b82f6;
+            pointer-events: auto !important;
+            /* 点可以被点击/拖拽 */
+            transform: translate(-50%, -50%);
+        }
+
+        /* 矩形 8 个点的布局 */
+        .handle-tl {
+            top: 0;
+            left: 0;
+            cursor: nwse-resize;
+        }
+
+        .handle-tc {
+            top: 0;
+            left: 50%;
+            cursor: ns-resize;
+        }
+
+        .handle-tr {
+            top: 0;
+            left: 100%;
+            cursor: nesw-resize;
+        }
+
+        .handle-ml {
+            top: 50%;
+            left: 0;
+            cursor: ew-resize;
+        }
+
+        .handle-mr {
+            top: 50%;
+            left: 100%;
+            cursor: ew-resize;
+        }
+
+        .handle-bl {
+            top: 100%;
+            left: 0;
+            cursor: nesw-resize;
+        }
+
+        .handle-bc {
+            top: 100%;
+            left: 50%;
+            cursor: ns-resize;
+        }
+
+        .handle-br {
+            top: 100%;
+            left: 100%;
+            cursor: nwse-resize;
+        }
+
+        /* Line 特殊点位布局 (由 selectionStyle 计算出的绝对位置或偏移) */
+        .handle-line-start,
+        .handle-line-end {
+            border-radius: 50%;
+            /* 圆形手柄 */
+            width: 10px;
+            /* 稍微大一点点，更好抓取 */
+            height: 10px;
+            cursor: move;
+        }
     </style>
 
 </head>
@@ -168,9 +247,19 @@
                 <pre id="ascii-container"
                     class="absolute inset-0 pointer-events-none select-none text-white whitespace-pre">{{ screenOutput }}</pre>
 
-                <div v-if="selectedNode"
-                    class="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none transition-all duration-75"
-                    :style="selectionStyle">
+                <div class="selection-box" :style="selectionStyle" v-if="selectedNode">
+                    <template v-if="selectedNode.type === 'Rect'">
+                        <div v-for="p in ['tl','tc','tr','ml','mr','bl','bc','br']" :key="p"
+                            :class="['handle', 'handle-' + p]" @mousedown.stop="handleResizeStart($event, p)">
+                        </div>
+                    </template>
+                    <div v-if="selectedNode.type === 'Line'">
+                        <div v-for="(pos, index) in handlePositions" :key="index"
+                            :class="['handle', index === 0 ? 'handle-line-start' : 'handle-line-end']"
+                            :style="{ left: pos.left, top: pos.top }"
+                            @mousedown.stop="handleResizeStart($event, index === 0 ? 'start' : 'end')">
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
