@@ -543,57 +543,102 @@ class Line extends Shape {
 
     _calculatePath(x1, y1, x2, y2, startSide, endSide) {
         console.log(`_calculatePath: (${x1},${y1}, ${startSide}) to (${x2},${y2}, ${endSide})`);
-        let path = [{ x: x1, y: y1 }];
+        const path = [{ x: x1, y: y1 }];
 
-        // 1. 处理起点：如果起始方向被吸附固定
-        let currentX = x1;
-        let currentY = y1;
+        // 1. 定义辅助判定
+        const isStartHoriz = (startSide === 'left' || startSide === 'right');
+        const isEndHoriz = (endSide === 'left' || endSide === 'right');
 
-        // 2. 确定路径策略
-        // 逻辑：如果起点是水平吸附(left/right)，它倾向于先走完 dx
-        // 如果起点是垂直吸附(top/bottom)，它倾向于先走完 dy
-        const isStartHorizontal = (startSide === 'left' || startSide === 'right');
-        const isStartVertical = (startSide === 'top' || startSide === 'bottom');
-        const isEndHorizontal = (endSide === 'left' || endSide === 'right');
-        const isEndVertical = (endSide === 'top' || endSide === 'bottom');
+        // 2. 针对【水平面对面】且【空间不足】的 5 段特殊处理 (Right -> Left)
+        if (startSide === 'right' && endSide === 'left') {
+            if (x2 - x1 < 2) {
+                // 空间不足，强制绕路
+                const offset = 1;
+                const escapeX = x1 + offset;   // 起点向右逃逸
+                const entryX = x2 - offset;    // 终点向左逃逸
+                const midY = (y1 + y2) / 2;    // 在 Y 的中间转弯
 
-        // 情况 A：吸附方向冲突 (例如起点强制水平，终点也强制水平，但 y 不等) -> 5段
-        if (isStartHorizontal && isEndHorizontal && y1 !== y2) {
-            // 5段逻辑：先水平伸出 -> 垂直折返 -> 再次水平进入
-            const midX = Math.floor((x1 + x2) / 2);
-            path.push({ x: midX, y: y1 });
-            path.push({ x: midX, y: y2 });
-        }
-        // 情况 B：标准曼哈顿 (2段或3段)
-        else if (isStartHorizontal) {
-            // 强制先水平，再垂直
-            path.push({ x: x2, y: y1 });
-        }
-        else if (isStartVertical) {
-            // 强制先垂直，再水平
-            path.push({ x: x1, y: y2 });
-        }
-        // 情况 C：起点无吸附，根据终点约束自动选择
-        else {
-            if (isEndHorizontal) {
-                // 为了垂直进入水平边，起点先垂直走
-                path.push({ x: x1, y: y2 });
-            } else {
-                // 为了水平进入垂直边，起点先水平走
-                path.push({ x: x2, y: y1 });
+                path.push({ x: escapeX, y: y1 });
+                path.push({ x: escapeX, y: Math.round(midY) });
+                path.push({ x: entryX, y: Math.round(midY) });
+                path.push({ x: entryX, y: y2 });
+                path.push({ x: x2, y: y2 });
+                return this._finalizePath(path);
             }
         }
 
-        // 确保终点被添加
-        const lastPoint = path[path.length - 1];
-        if (lastPoint.x !== x2 || lastPoint.y !== y2) {
-            path.push({ x: x2, y: y2 });
+        // 3. 针对【水平面对面】且【空间不足】的 5 段特殊处理 (Left -> Right)
+        if (startSide === 'left' && endSide === 'right') {
+            if (x1 - x2 < 2) {
+                const offset = 1;
+                const escapeX = x1 - offset;
+                const entryX = x2 + offset;
+                const midY = (y1 + y2) / 2;
+
+                path.push({ x: escapeX, y: y1 });
+                path.push({ x: escapeX, y: Math.round(midY) });
+                path.push({ x: entryX, y: Math.round(midY) });
+                path.push({ x: entryX, y: y2 });
+                path.push({ x: x2, y: y2 });
+                return this._finalizePath(path);
+            }
         }
 
-        // 过滤重复点（原地转弯的情况）
-        const r = path.filter((p, i) => i === 0 || p.x !== path[i - 1].x || p.y !== path[i - 1].y);
+        // 4. 针对【垂直面对面】且【空间不足】的处理 (Bottom -> Top)
+        if (startSide === 'bottom' && endSide === 'top') {
+            if (y2 - y1 < 2) {
+                const offset = 1;
+                const escapeY = y1 + offset;
+                const entryY = y2 - offset;
+                const midX = (x1 + x2) / 2;
+
+                path.push({ x: x1, y: escapeY });
+                path.push({ x: Math.round(midX), y: escapeY });
+                path.push({ x: Math.round(midX), y: entryY });
+                path.push({ x: x2, y: entryY });
+                path.push({ x: x2, y: y2 });
+                return this._finalizePath(path);
+            }
+        }
+
+        // 5. 针对【垂直面对面】且【空间不足】的处理 (Top -> Bottom)
+        if (startSide === 'top' && endSide === 'bottom') {
+            if (y1 - y2 < 2) {
+                const offset = 1;
+                const escapeY = y1 - offset;
+                const entryY = y2 + offset;
+                const midX = (x1 + x2) / 2;
+
+                path.push({ x: x1, y: escapeY });
+                path.push({ x: Math.round(midX), y: escapeY });
+                path.push({ x: Math.round(midX), y: entryY });
+                path.push({ x: x2, y: entryY });
+                path.push({ x: x2, y: y2 });
+                return this._finalizePath(path);
+            }
+        }
+
+        // 6. 通用逻辑：标准曼哈顿 (2段或3段)
+        if (isStartHoriz) {
+            // 起点水平限制：先走 X 再走 Y
+            path.push({ x: x2, y: y1 });
+        } else if (isEndHoriz) {
+            // 终点水平限制：先走 Y 再走 X
+            path.push({ x: x1, y: y2 });
+        } else {
+            // 自由端点：默认先水平后垂直
+            path.push({ x: x2, y: y1 });
+        }
+
+        path.push({ x: x2, y: y2 });
+        const r = this._finalizePath(path);
         console.log(`_calculatePath result: ${JSON.stringify(r)}`);
         return r;
+    }
+
+    // 辅助方法：去重和清理
+    _finalizePath(path) {
+        return path.filter((p, i) => i === 0 || p.x !== path[i - 1].x || p.y !== path[i - 1].y);
     }
 
     _drawSegment(buffer, px1, py1, px2, py2, charset) {
