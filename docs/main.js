@@ -470,43 +470,6 @@ class Line extends Shape {
         // 2. 绘制主体折线
         this._drawLine2(buffer, drawX1, drawY1, drawX2, drawY2, startSide, endSide);
     }
-    //     const charset = CHAR_STYLES[this.style];
-
-    //     // 3. 补全起点装饰
-    //     if (this.startStyle === 'arrow') {
-    //         const side = startSide || this._getMarkerSide(true, x1, y1, x2, y2);
-    //         this._drawMarker(buffer, drawX1, drawY1, side);
-    //     } else {
-    //         // --- 核心修复：如果不是箭头，补全起始点的直线字符 ---
-    //         // 这里的方向判定：如果有 startSide，字符方向必须与 side 垂直
-    //         // (比如 side 是 left/right，画横线；side 是 top/bottom，画竖线)
-    //         let char = charset.h;
-    //         if (startSide === 'top' || startSide === 'bottom') char = charset.v;
-    //         // 如果没有吸附，根据与下一个路径点的关系判定（通常是第一个转折方向）
-    //         else if (!startSide) {
-    //             // 这里简单根据整体 dx/dy 判定，或者取 calculatePath 的第二个点
-    //             char = Math.abs(x2 - x1) > Math.abs(y2 - y1) ? charset.h : charset.v;
-    //         }
-
-    //         if (drawY1 >= 0 && drawY1 < ROWS && drawX1 >= 0 && drawX1 < COLS) {
-    //             buffer[drawY1][drawX1] = merge(char, buffer[drawY1][drawX1]);
-    //         }
-    //     }
-
-    //     // 4. 补全终点装饰
-    //     if (this.endStyle === 'arrow') {
-    //         const side = endSide || this._getMarkerSide(false, x1, y1, x2, y2);
-    //         this._drawMarker(buffer, drawX2, drawY2, side);
-    //     } else {
-    //         // --- 同理：补全终点的直线字符 ---
-    //         let char = (endSide === 'top' || endSide === 'bottom') ? charset.v : charset.h;
-    //         if (!endSide) char = Math.abs(x2 - x1) > Math.abs(y2 - y1) ? charset.h : charset.v;
-
-    //         if (drawY2 >= 0 && drawY2 < ROWS && drawX2 >= 0 && drawX2 < COLS) {
-    //             buffer[drawY2][drawX2] = merge(char, buffer[drawY2][drawX2]);
-    //         }
-    //     }
-    // }
 
     _drawLine2(buffer, x1, y1, x2, y2, startSide, endSide) {
         console.log(`_drawLine2: (${x1},${y1}, ${startSide}) to (${x2},${y2}, ${endSide})`);
@@ -842,16 +805,104 @@ createApp({
             };
         });
 
-        const screenOutput = computed(() => {
+        const renderToBuffer = () => {
             const buffer = createBuffer();
             const ctx = new Context(buffer, model);
-            // 按照层级依次调用各自的 draw 方法
+            // 按照层级绘制所有形状
             model.shapes.forEach(node => {
-                console.log(node);
                 node.draw(ctx);
             });
+            return buffer;
+        };
+
+        const screenOutput = computed(() => {
+            const buffer = renderToBuffer();
             return buffer.map(row => row.join('')).join('\n');
         });
+
+        const copyToClipboard = async () => {
+            // 1. 获取最新的渲染数据
+            const buffer = renderToBuffer();
+
+            // 2. 扫描非空边界
+            let minX = COLS, maxX = -1;
+            let minY = ROWS, maxY = -1;
+            let hasContent = false;
+
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    const char = buffer[y][x];
+                    // 排除空格和未定义字符
+                    if (char && char !== ' ') {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                        hasContent = true;
+                    }
+                }
+            }
+
+            if (!hasContent) {
+                console.warn("Canvas is empty, nothing to copy.");
+                return;
+            }
+
+            // 3. 裁剪并构建字符串
+            let output = "";
+            for (let y = minY; y <= maxY; y++) {
+                let rowStr = "";
+                for (let x = minX; x <= maxX; x++) {
+                    rowStr += buffer[y][x] || " ";
+                }
+                // trimEnd 移除行尾冗余空格，但在最后一行不加换行符
+                output += rowStr.trimEnd() + (y === maxY ? "" : "\n");
+            }
+
+            // 4. 调用剪贴板 API
+            try {
+                await navigator.clipboard.writeText(output);
+                // 这里可以添加一个反馈效果
+                console.log("Copied to clipboard with cropping!");
+            } catch (err) {
+                console.error("Failed to copy to clipboard:", err);
+            }
+        };
+
+        const downloadFile = () => {
+            // 1. 构造 JSON 数据结构
+            const data = {
+                version: 1,
+                // 调用每个 shape 的 toJSON() 方法
+                shapes: model.shapes.map(shape => shape.toJSON())
+            };
+
+            // 2. 将对象转换为 JSON 字符串 (包含 2 空格缩进，方便人类阅读)
+            const jsonString = JSON.stringify(data, null, 2);
+
+            console.log(">>> download >>>");
+            console.log(jsonString);
+
+            // 3. 创建 Blob 对象，指定类型为 json
+            const blob = new Blob([jsonString], { type: "application/json" });
+
+            // 4. 创建一个临时的下载链接
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.href = url;
+            link.download = "unamed.asciidraw"; // 指定下载文件名
+
+            // 5. 触发点击并移除临时对象
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // 释放 URL 对象，节省内存
+            URL.revokeObjectURL(url);
+
+            console.log("File exported as unamed.asciidraw");
+        };
 
         const handlePositions = computed(() => {
             const n = selectedNode.value;
@@ -1036,7 +1087,7 @@ createApp({
         });
 
         return {
-            model, canvasWidth, canvasHeight, screenOutput,
+            model, canvasWidth, canvasHeight, screenOutput, copyToClipboard, downloadFile,
             selectedNodeId, selectedNode, selectionStyle, snapStyle, config,
             handlePositions, handleResizeStart,
             handleCanvasClick, currentGrid

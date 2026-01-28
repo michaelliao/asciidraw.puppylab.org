@@ -212,18 +212,19 @@
             <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Save File">
                 <i data-lucide="save" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Download File">
+            <button @click="downloadFile" title="Download File"
+                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
                 <i data-lucide="download" class="w-5 h-5"></i>
+            </button>
+            <button @click="copyToClipboard" title="Copy to Clipboard"
+                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+                <i data-lucide="clipboard-check" class="w-5 h-5"></i>
             </button>
             <div class="h-6 w-px bg-gray-600 mx-2"></div>
             <button class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition"
                 title="Select">
                 <i data-lucide="mouse-pointer" class="w-5 h-5"></i>
             </button>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Move">
-                <i data-lucide="move" class="w-5 h-5"></i>
-            </button>
-            <div class="h-6 w-px bg-gray-600 mx-2"></div>
             <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Rectangle">
                 <i data-lucide="square" class="w-5 h-5"></i>
             </button>
