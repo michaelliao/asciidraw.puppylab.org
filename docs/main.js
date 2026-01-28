@@ -446,11 +446,12 @@ class Line extends Shape {
     }
 
     _drawLine1(buffer, x1, y1, startSide, x2, y2, endSide) {
+        console.log(`_drawLine1: (${x1},${y1}) ${startSide} to (${x2},${y2}) ${endSide}`);
         // 默认绘图起止点先同步锚点
         let drawX1 = x1, drawY1 = y1;
         let drawX2 = x2, drawY2 = y2;
 
-        // --- 重点：如果有连接，锚点(x,y)空出来，绘图点向外偏移一格 ---
+        // 1. 偏移逻辑 (保护锚点)
         if (startSide) {
             if (startSide === 'top') drawY1--; // 锚点在顶，绘图从上一行开始
             if (startSide === 'bottom') drawY1++; // 锚点在底，绘图从下一行开始
@@ -465,71 +466,242 @@ class Line extends Shape {
             if (endSide === 'right') drawX2++;
         }
 
-        // 1. 绘制主体线条 (从偏移后的点开始)
-        this._drawLine2(buffer, drawX1, drawY1, drawX2, drawY2);
+        // 2. 绘制主体折线
+        this._drawLine2(buffer, drawX1, drawY1, drawX2, drawY2, startSide, endSide);
+    }
+    //     const charset = CHAR_STYLES[this.style];
 
-        // 2. 绘制装饰器 (箭头)
-        // 注意：箭头也必须画在偏移后的 drawX/drawY 上，而不是原始的 x1/x2 上
-        if (this.startStyle === 'arrow') {
-            const side = startSide || this._getMarkerSide(true, x1, y1, x2, y2);
-            this._drawMarker(buffer, drawX1, drawY1, side);
+    //     // 3. 补全起点装饰
+    //     if (this.startStyle === 'arrow') {
+    //         const side = startSide || this._getMarkerSide(true, x1, y1, x2, y2);
+    //         this._drawMarker(buffer, drawX1, drawY1, side);
+    //     } else {
+    //         // --- 核心修复：如果不是箭头，补全起始点的直线字符 ---
+    //         // 这里的方向判定：如果有 startSide，字符方向必须与 side 垂直
+    //         // (比如 side 是 left/right，画横线；side 是 top/bottom，画竖线)
+    //         let char = charset.h;
+    //         if (startSide === 'top' || startSide === 'bottom') char = charset.v;
+    //         // 如果没有吸附，根据与下一个路径点的关系判定（通常是第一个转折方向）
+    //         else if (!startSide) {
+    //             // 这里简单根据整体 dx/dy 判定，或者取 calculatePath 的第二个点
+    //             char = Math.abs(x2 - x1) > Math.abs(y2 - y1) ? charset.h : charset.v;
+    //         }
+
+    //         if (drawY1 >= 0 && drawY1 < ROWS && drawX1 >= 0 && drawX1 < COLS) {
+    //             buffer[drawY1][drawX1] = merge(char, buffer[drawY1][drawX1]);
+    //         }
+    //     }
+
+    //     // 4. 补全终点装饰
+    //     if (this.endStyle === 'arrow') {
+    //         const side = endSide || this._getMarkerSide(false, x1, y1, x2, y2);
+    //         this._drawMarker(buffer, drawX2, drawY2, side);
+    //     } else {
+    //         // --- 同理：补全终点的直线字符 ---
+    //         let char = (endSide === 'top' || endSide === 'bottom') ? charset.v : charset.h;
+    //         if (!endSide) char = Math.abs(x2 - x1) > Math.abs(y2 - y1) ? charset.h : charset.v;
+
+    //         if (drawY2 >= 0 && drawY2 < ROWS && drawX2 >= 0 && drawX2 < COLS) {
+    //             buffer[drawY2][drawX2] = merge(char, buffer[drawY2][drawX2]);
+    //         }
+    //     }
+    // }
+
+    _drawLine2(buffer, x1, y1, x2, y2, startSide, endSide) {
+        console.log(`_drawLine2: (${x1},${y1}, ${startSide}) to (${x2},${y2}, ${endSide})`);
+        const charset = CHAR_STYLES[this.style];
+        const points = this._calculatePath(x1, y1, x2, y2, startSide, endSide);
+
+        // 1. 绘制直线段（跳过每段的端点，避免覆盖拐角和箭头）
+        for (let i = 0; i < points.length - 1; i++) {
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            this._drawSegment(buffer, p1.x, p1.y, p2.x, p2.y, charset);
         }
 
+        // 2. 绘制拐角字符
+        this._drawCorners(buffer, points, charset);
+
+        // 3. 处理起点装饰
+        if (this.startStyle === 'arrow') {
+            const side = startSide || this._getMarkerSide(true, points[0], points[1]);
+            this._drawMarker(buffer, x1, y1, side);
+        } else {
+            // 如果是 normal，补全起点缺失的那一格线
+            this._fillGapWithLine(buffer, points[0], points[1], charset);
+        }
+
+        // 4. 处理终点装饰
         if (this.endStyle === 'arrow') {
-            const side = endSide || this._getMarkerSide(false, x1, y1, x2, y2);
-            this._drawMarker(buffer, drawX2, drawY2, side);
+            const side = endSide || this._getMarkerSide(false, points[points.length - 2], points[points.length - 1]);
+            this._drawMarker(buffer, x2, y2, side);
+        } else {
+            // 如果是 normal，补全终点缺失的那一格线
+            this._fillGapWithLine(buffer, points[points.length - 1], points[points.length - 2], charset);
         }
     }
 
-    _getMarkerSide(isStart, x1, y1, x2, y2) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
+    _calculatePath(x1, y1, x2, y2, startSide, endSide) {
+        console.log(`_calculatePath: (${x1},${y1}, ${startSide}) to (${x2},${y2}, ${endSide})`);
+        let path = [{ x: x1, y: y1 }];
+
+        // 1. 处理起点：如果起始方向被吸附固定
+        let currentX = x1;
+        let currentY = y1;
+
+        // 2. 确定路径策略
+        // 逻辑：如果起点是水平吸附(left/right)，它倾向于先走完 dx
+        // 如果起点是垂直吸附(top/bottom)，它倾向于先走完 dy
+        const isStartHorizontal = (startSide === 'left' || startSide === 'right');
+        const isStartVertical = (startSide === 'top' || startSide === 'bottom');
+        const isEndHorizontal = (endSide === 'left' || endSide === 'right');
+        const isEndVertical = (endSide === 'top' || endSide === 'bottom');
+
+        // 情况 A：吸附方向冲突 (例如起点强制水平，终点也强制水平，但 y 不等) -> 5段
+        if (isStartHorizontal && isEndHorizontal && y1 !== y2) {
+            // 5段逻辑：先水平伸出 -> 垂直折返 -> 再次水平进入
+            const midX = Math.floor((x1 + x2) / 2);
+            path.push({ x: midX, y: y1 });
+            path.push({ x: midX, y: y2 });
+        }
+        // 情况 B：标准曼哈顿 (2段或3段)
+        else if (isStartHorizontal) {
+            // 强制先水平，再垂直
+            path.push({ x: x2, y: y1 });
+        }
+        else if (isStartVertical) {
+            // 强制先垂直，再水平
+            path.push({ x: x1, y: y2 });
+        }
+        // 情况 C：起点无吸附，根据终点约束自动选择
+        else {
+            if (isEndHorizontal) {
+                // 为了垂直进入水平边，起点先垂直走
+                path.push({ x: x1, y: y2 });
+            } else {
+                // 为了水平进入垂直边，起点先水平走
+                path.push({ x: x2, y: y1 });
+            }
+        }
+
+        // 确保终点被添加
+        const lastPoint = path[path.length - 1];
+        if (lastPoint.x !== x2 || lastPoint.y !== y2) {
+            path.push({ x: x2, y: y2 });
+        }
+
+        // 过滤重复点（原地转弯的情况）
+        const r = path.filter((p, i) => i === 0 || p.x !== path[i - 1].x || p.y !== path[i - 1].y);
+        console.log(`_calculatePath result: ${JSON.stringify(r)}`);
+        return r;
+    }
+
+    _drawSegment(buffer, px1, py1, px2, py2, charset) {
+        const dx = px2 - px1;
+        const dy = py2 - py1;
+        const char = dx !== 0 ? charset.h : charset.v;
+
+        const minX = Math.min(px1, px2), maxX = Math.max(px1, px2);
+        const minY = Math.min(py1, py2), maxY = Math.max(py1, py2);
+
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+                // 重点：跳过线段的两个端点
+                if ((x === px1 && y === py1) || (x === px2 && y === py2)) continue;
+
+                if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
+                    buffer[y][x] = merge(char, buffer[y][x]);
+                }
+            }
+        }
+    }
+
+    _drawCorners(buffer, points, charset) {
+        // 只有 3 个点及以上才存在拐角，i 从 1 到倒数第二个点
+        for (let i = 1; i < points.length - 1; i++) {
+            const prev = points[i - 1];
+            const curr = points[i];
+            const next = points[i + 1];
+
+            // 1. 计算进入向量 (in) 和 离开向量 (out)
+            const inDx = curr.x - prev.x;
+            const inDy = curr.y - prev.y;
+            const outDx = next.x - curr.x;
+            const outDy = next.y - curr.y;
+
+            let cornerChar = '';
+
+            // 2. 判定转角类型
+            if (inDx > 0) { // 水平向右进
+                if (outDy > 0) cornerChar = charset.tr; // ┐ (向右再向下)
+                else if (outDy < 0) cornerChar = charset.br; // ┘ (向右再向上)
+            }
+            else if (inDx < 0) { // 水平向左进
+                if (outDy > 0) cornerChar = charset.tl; // ┌ (向左再向下)
+                else if (outDy < 0) cornerChar = charset.bl; // └ (向左再向上)
+            }
+            else if (inDy > 0) { // 垂直向下进
+                if (outDx > 0) cornerChar = charset.bl; // └ (向下再向右)
+                else if (outDx < 0) cornerChar = charset.br; // ┘ (向下再向左)
+            }
+            else if (inDy < 0) { // 垂直向上进
+                if (outDx > 0) cornerChar = charset.tl; // ┌ (向上再向右)
+                else if (outDx < 0) cornerChar = charset.tr; // ┐ (向上再向左)
+            }
+
+            // 3. 写入缓冲区 (使用 merge 以兼容底层其他图形)
+            if (cornerChar && curr.y >= 0 && curr.y < ROWS && curr.x >= 0 && curr.x < COLS) {
+                buffer[curr.y][curr.x] = merge(cornerChar, buffer[curr.y][curr.x]);
+            }
+        }
+    }
+
+    _fillGapWithLine(buffer, p, pNext, charset) {
+        if (!pNext) return;
+        const char = (p.x !== pNext.x) ? charset.h : charset.v;
+        if (p.y >= 0 && p.y < ROWS && p.x >= 0 && p.x < COLS) {
+            buffer[p.y][p.x] = merge(char, buffer[p.y][p.x]);
+        }
+    }
+
+    _drawMarker(buffer, x, y, side) {
+        // 1. 安全检查，防止端点超出画布边界
+        if (x < 0 || x >= COLS || y < 0 || y < 0 || y >= ROWS) {
+            return;
+        }
+
+        // 2. 获取对应方向的箭头字符
+        // 这里的 side 是吸附边的方向，箭头应该“指向”这条边
+        const char = ARROW_CHARS[side];
+
+        if (char) {
+            // 3. 写入缓冲区
+            // 注意：这里我们使用直接赋值。
+            // 因为在我们的逻辑中，箭头是线条的终结，且它占据的位置
+            // 应当是原本矩形边框的位置（或者自由端点的位置）。
+            // 如果你希望箭头也能和底层背景融合，也可以改用 merge(char, buffer[y][x])
+            buffer[y][x] = char;
+
+            console.log(`_drawMarker: Placed ${char} at (${x}, ${y}) for side ${side}`);
+        }
+    }
+
+    _getMarkerSide(isStart, pCurrent, pOther) {
+        const dx = pOther.x - pCurrent.x;
+        const dy = pOther.y - pCurrent.y;
 
         if (isStart) {
-            // 起点：如果 x2 在右边，起点箭头应该向左指
-            if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'right' : 'left';
-            return dy > 0 ? 'bottom' : 'top';
+            // 起点箭头：方向与离开点的向量相反
+            if (dx > 0) return 'left';
+            if (dx < 0) return 'right';
+            if (dy > 0) return 'top';
+            return 'bottom';
         } else {
-            // 终点：如果 x2 在右边，终点箭头应该向右指
-            if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'left' : 'right';
-            return dy > 0 ? 'top' : 'bottom';
-        }
-    }
-
-    // 独立的 Marker 绘制方法，方便以后扩展圆点、菱形等
-    _drawMarker(buffer, x, y, side) {
-        console.log(`_drawMarker: (${x},${y}) side=${side}`);
-        if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
-            // 箭头的朝向：如果吸附在 top 边，箭头应该向上指
-            buffer[y][x] = ARROW_CHARS[side] || '*';
-        }
-    }
-
-    _drawLine2(buffer, x1, y1, x2, y2) {
-        console.log(`_drawLine2: (${x1},${y1}) to (${x2},${y2})`);
-        const dx = Math.abs(x2 - x1);
-        const dy = Math.abs(y2 - y1);
-        const sx = (x1 < x2) ? 1 : -1;
-        const sy = (y1 < y2) ? 1 : -1;
-        let err = dx - dy;
-
-        const charset = CHAR_STYLES[this.style];
-
-        while (true) {
-            if (y1 >= 0 && y1 < ROWS && x1 >= 0 && x1 < COLS) {
-                // 根据 style 获取基本字符
-                let char = '*';
-                if (dx === 0) char = charset.v;
-                else if (dy === 0) char = charset.h;
-
-                // 重点：使用 merge 写入 buffer
-                const existing = buffer[y1][x1];
-                buffer[y1][x1] = merge(char, existing);
-            }
-            if (x1 === x2 && y1 === y2) break;
-            const e2 = 2 * err;
-            if (e2 > -dy) { err -= dy; x1 += sx; }
-            if (e2 < dx) { err += dx; y1 += sy; }
+            // 终点箭头：方向指向目标
+            if (dx > 0) return 'left';   // 从左往右指，吸附在左语义
+            if (dx < 0) return 'right';
+            if (dy > 0) return 'top';
+            return 'bottom';
         }
     }
 }
@@ -547,9 +719,9 @@ createApp({
 
         const model = new Model(config);
         model.shapes.push(
-            new Rectangle(10, 5, 30, 11),
-            new Rectangle(17, 8, 30, 12),
-            new Rectangle(27, 3, 30, 12),
+            new Rectangle(3, 1, 5, 3),
+            new Rectangle(24, 5, 10, 5),
+            new Rectangle(37, 3, 20, 12),
             new Rectangle(62, 3, 29, 9),
             new Rectangle(62, 13, 29, 9),
             new Line(5, 5, 5, 12),   // 垂直线
