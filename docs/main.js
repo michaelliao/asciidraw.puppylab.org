@@ -12,6 +12,13 @@ const CHAR_STYLES = {
     double: { h: '═', v: '║', tl: '╔', tr: '╗', bl: '╚', br: '╝' }
 };
 
+const ARROW_CHARS = {
+    top: '▼',
+    bottom: '▲',
+    left: '▶',
+    right: '◀'
+};
+
 const DIR_MAP = {
     // 单线 (Weight 1)
     '─': { t: 0, b: 0, l: 1, r: 1 }, '│': { t: 1, b: 1, l: 0, r: 0 },
@@ -182,6 +189,16 @@ class Shape {
         this.name = this.type + ' ' + this.id;
     }
 
+    toJSON() {
+        return {
+            id: this.id,
+            type: this.type,
+            x: this.x,
+            y: this.y,
+            style: this.style
+        };
+    }
+
     // 命中检测：子类需实现：
     isHit(gx, gy) { return false; }
 
@@ -205,6 +222,18 @@ class Rectangle extends Shape {
         this.alignX = 'center'; // 'left', 'center', 'right'
         this.alignY = 'center'; // 'top', 'center', 'bottom'
         this.wrap = true;       // 是否自动折行
+    }
+
+    toJSON() {
+        let json = super.toJSON();
+        json.w = this.w;
+        json.h = this.h;
+        json.transparent = this.transparent;
+        json.text = this.text;
+        json.alignX = this.alignX;
+        json.alignY = this.alignY;
+        json.wrap = this.wrap;
+        return json;
     }
 
     isHit(gx, gy) {
@@ -241,6 +270,7 @@ class Rectangle extends Shape {
     }
 
     draw(ctx) {
+        console.log(JSON.stringify(this.toJSON()));
         const buffer = ctx.buffer;
         const hasBorder = this.style !== 'none';
         const charset = hasBorder ? CHAR_STYLES[this.style] : null;
@@ -338,6 +368,20 @@ class Line extends Shape {
         this.y2 = y2;
         this.startBinding = { nodeId: null, side: null };
         this.endBinding = { nodeId: null, side: null };
+        // 样式属性
+        this.startStyle = 'normal'; // 'normal' | 'arrow'
+        this.endStyle = 'arrow';   // 默认给终点加个箭头比较直观
+    }
+
+    toJSON() {
+        let json = super.toJSON();
+        json.x2 = this.x2;
+        json.y2 = this.y2;
+        json.startBinding = this.startBinding;
+        json.endBinding = this.endBinding;
+        json.startStyle = this.startStyle;
+        json.endStyle = this.endStyle;
+        return json;
     }
 
     isHit(gx, gy) {
@@ -369,29 +413,100 @@ class Line extends Shape {
                 if (target && target.type === 'Rect') {
                     const { x, y, w, h } = target.getBounds();
                     switch (binding.side) {
-                        case 'top': return { x: x + Math.floor(w / 2), y: y };
-                        case 'bottom': return { x: x + Math.floor(w / 2), y: y + h - 1 };
-                        case 'left': return { x: x, y: y + Math.floor(h / 2) };
-                        case 'right': return { x: x + w - 1, y: y + Math.floor(h / 2) };
+                        case 'top': return { x: x + Math.floor(w / 2), y: y, side: 'top' };
+                        case 'bottom': return { x: x + Math.floor(w / 2), y: y + h - 1, side: 'bottom' };
+                        case 'left': return { x: x, y: y + Math.floor(h / 2), side: 'left' };
+                        case 'right': return { x: x + w - 1, y: y + Math.floor(h / 2), side: 'right' };
                     }
                 }
             }
-            return point;
+            return { ...point, side: null };
         };
 
         const start = resolve({ x: this.x, y: this.y }, this.startBinding);
         const end = resolve({ x: this.x2, y: this.y2 }, this.endBinding);
 
-        return { x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+        return {
+            x1: start.x, y1: start.y, startSide: start.side,
+            x2: end.x, y2: end.y, endSide: end.side
+        };
     }
 
     draw(ctx) {
         // 从 ctx.model 解析坐标:
-        const { x1, y1, x2, y2 } = this.getEffectiveCoords(ctx.model);
-        this._drawLine(ctx.buffer, x1, y1, x2, y2);
+        const { x1, y1, startSide, x2, y2, endSide } = this.getEffectiveCoords(ctx.model);
+        // 实时同步：确保逻辑坐标始终等于当前的有效物理坐标
+        // 这样无论矩形怎么动，Line 的手柄位置计算永远是正确的
+        this.x = x1;
+        this.y = y1;
+        this.x2 = x2;
+        this.y2 = y2;
+        console.log(JSON.stringify(this.toJSON()));
+        this._drawLine1(ctx.buffer, x1, y1, startSide, x2, y2, endSide);
     }
 
-    _drawLine(buffer, x1, y1, x2, y2) {
+    _drawLine1(buffer, x1, y1, startSide, x2, y2, endSide) {
+        // 默认绘图起止点先同步锚点
+        let drawX1 = x1, drawY1 = y1;
+        let drawX2 = x2, drawY2 = y2;
+
+        // --- 重点：如果有连接，锚点(x,y)空出来，绘图点向外偏移一格 ---
+        if (startSide) {
+            if (startSide === 'top') drawY1--; // 锚点在顶，绘图从上一行开始
+            if (startSide === 'bottom') drawY1++; // 锚点在底，绘图从下一行开始
+            if (startSide === 'left') drawX1--; // 锚点在左，绘图从左一列开始
+            if (startSide === 'right') drawX1++; // 锚点在右，绘图从右一列开始
+        }
+
+        if (endSide) {
+            if (endSide === 'top') drawY2--;
+            if (endSide === 'bottom') drawY2++;
+            if (endSide === 'left') drawX2--;
+            if (endSide === 'right') drawX2++;
+        }
+
+        // 1. 绘制主体线条 (从偏移后的点开始)
+        this._drawLine2(buffer, drawX1, drawY1, drawX2, drawY2);
+
+        // 2. 绘制装饰器 (箭头)
+        // 注意：箭头也必须画在偏移后的 drawX/drawY 上，而不是原始的 x1/x2 上
+        if (this.startStyle === 'arrow') {
+            const side = startSide || this._getMarkerSide(true, x1, y1, x2, y2);
+            this._drawMarker(buffer, drawX1, drawY1, side);
+        }
+
+        if (this.endStyle === 'arrow') {
+            const side = endSide || this._getMarkerSide(false, x1, y1, x2, y2);
+            this._drawMarker(buffer, drawX2, drawY2, side);
+        }
+    }
+
+    _getMarkerSide(isStart, x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+
+        if (isStart) {
+            // 起点：如果 x2 在右边，起点箭头应该向左指
+            if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'right' : 'left';
+            return dy > 0 ? 'bottom' : 'top';
+        } else {
+            // 终点：如果 x2 在右边，终点箭头应该向右指
+            if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'left' : 'right';
+            return dy > 0 ? 'top' : 'bottom';
+        }
+    }
+
+    // 独立的 Marker 绘制方法，方便以后扩展圆点、菱形等
+    _drawMarker(buffer, x, y, side) {
+        console.log(`_drawMarker: (${x},${y}) side=${side}`);
+        if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
+            // 箭头的朝向：如果吸附在 top 边，箭头应该向上指
+            buffer[y][x] = ARROW_CHARS[side] || '*';
+        }
+    }
+
+    _drawLine2(buffer, x1, y1, x2, y2) {
+        console.log(`_drawLine2: (${x1},${y1}) to (${x2},${y2})`);
         const dx = Math.abs(x2 - x1);
         const dy = Math.abs(y2 - y1);
         const sx = (x1 < x2) ? 1 : -1;
