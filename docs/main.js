@@ -143,7 +143,31 @@ const RESIZE_MAP = {
     'br': [0, 0, 1, 1],   // 右下：只改 w 和 h
 };
 
+/**
+ * Context: 渲染上下文，携带绘图环境
+ */
+class Context {
+    constructor(buffer, model) {
+        this.buffer = buffer; // 二维数组
+        this.model = model;   // 指向 Model 实例
+        this.rows = buffer.length;
+        this.cols = buffer[0].length;
+    }
+}
 
+/**
+ * Model: 存储所有图形数据和全局状态
+ */
+class Model {
+    constructor(config) {
+        this.shapes = reactive([]); // 存放 Rectangle, Line 等
+        this.config = config;
+    }
+
+    findShape(id) {
+        return this.shapes.find(s => s.id === id);
+    }
+}
 
 // 基础图形类：
 class Shape {
@@ -216,7 +240,8 @@ class Rectangle extends Shape {
         return lines.slice(0, maxHeight);
     }
 
-    draw(buffer) {
+    draw(ctx) {
+        const buffer = ctx.buffer;
         const hasBorder = this.style !== 'none';
         const charset = hasBorder ? CHAR_STYLES[this.style] : null;
 
@@ -311,6 +336,8 @@ class Line extends Shape {
         super('Line', x1, y1);
         this.x2 = x2;
         this.y2 = y2;
+        this.startBinding = { nodeId: null, side: null };
+        this.endBinding = { nodeId: null, side: null };
     }
 
     isHit(gx, gy) {
@@ -331,32 +358,60 @@ class Line extends Shape {
         };
     }
 
-    draw(buffer) {
-        let x = this.x;
-        let y = this.y;
-        const dx = Math.abs(this.x2 - x);
-        const dy = Math.abs(this.y2 - y);
-        const sx = (x < this.x2) ? 1 : -1;
-        const sy = (y < this.y2) ? 1 : -1;
+    // 解析端点的最终网格位置
+    getEffectiveCoords(model) {
+        const resolve = (point, binding) => {
+            if (binding.nodeId) {
+                const target = model.findShape(binding.nodeId);
+                if (target && target.type === 'Rect') {
+                    const { x, y, w, h } = target.getBounds();
+                    switch (binding.side) {
+                        case 'top': return { x: x + Math.floor(w / 2), y: y };
+                        case 'bottom': return { x: x + Math.floor(w / 2), y: y + h - 1 };
+                        case 'left': return { x: x, y: y + Math.floor(h / 2) };
+                        case 'right': return { x: x + w - 1, y: y + Math.floor(h / 2) };
+                    }
+                }
+            }
+            return point;
+        };
+
+        const start = resolve({ x: this.x, y: this.y }, this.startBinding);
+        const end = resolve({ x: this.x2, y: this.y2 }, this.endBinding);
+
+        return { x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+    }
+
+    draw(ctx) {
+        // 从 ctx.model 解析坐标:
+        const { x1, y1, x2, y2 } = this.getEffectiveCoords(ctx.model);
+        this._drawLine(ctx.buffer, x1, y1, x2, y2);
+    }
+
+    _drawLine(buffer, x1, y1, x2, y2) {
+        const dx = Math.abs(x2 - x1);
+        const dy = Math.abs(y2 - y1);
+        const sx = (x1 < x2) ? 1 : -1;
+        const sy = (y1 < y2) ? 1 : -1;
         let err = dx - dy;
 
         const charset = CHAR_STYLES[this.style];
 
         while (true) {
-            if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
+            if (y1 >= 0 && y1 < ROWS && x1 >= 0 && x1 < COLS) {
                 // 根据 style 获取基本字符
                 let char = '*';
                 if (dx === 0) char = charset.v;
                 else if (dy === 0) char = charset.h;
 
                 // 重点：使用 merge 写入 buffer
-                const existing = buffer[y][x];
-                buffer[y][x] = merge(char, existing);
+                const existing = buffer[y1][x1];
+                buffer[y1][x1] = merge(char, existing);
             }
-            if (x === this.x2 && y === this.y2) break;
+            if (x1 === x2 && y1 === y2) break;
             const e2 = 2 * err;
-            if (e2 > -dy) { err -= dy; x += sx; }
-            if (e2 < dx) { err += dx; y += sy; }
+            if (e2 > -dy) { err -= dy; x1 += sx; }
+            if (e2 < dx) { err += dx; y1 += sy; }
         }
     }
 }
@@ -372,8 +427,8 @@ createApp({
         const selectedNodeId = ref(null);
         const currentGrid = ref({ x: 0, y: 0 });
 
-        // 使用类实例初始化节点
-        const nodes = ref([
+        const model = new Model(config);
+        model.shapes.push(
             new Rectangle(10, 5, 30, 11),
             new Rectangle(17, 8, 30, 12),
             new Rectangle(27, 3, 30, 12),
@@ -381,19 +436,20 @@ createApp({
             new Rectangle(62, 13, 29, 9),
             new Line(5, 5, 5, 12),   // 垂直线
             new Line(40, 20, 60, 20) // 水平线
-        ]);
-        nodes.value[1].style = 'bold';
-        nodes.value[2].style = 'double';
-        nodes.value[2].transparent = false;
-        nodes.value[3].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
-        nodes.value[4].style = 'none';
-        nodes.value[4].alignX = 'left';
-        nodes.value[4].alignY = 'top';
-        nodes.value[4].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
+        )
+
+        model.shapes[1].style = 'bold';
+        model.shapes[2].style = 'double';
+        model.shapes[2].transparent = false;
+        model.shapes[3].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
+        model.shapes[4].style = 'none';
+        model.shapes[4].alignX = 'left';
+        model.shapes[4].alignY = 'top';
+        model.shapes[4].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
 
         // 计算属性：当前选中的节点对象
         const selectedNode = computed(() =>
-            nodes.value.find(n => n.id === selectedNodeId.value)
+            model.shapes.find(n => n.id === selectedNodeId.value)
         );
 
         // 计算属性：高亮遮罩的样式
@@ -412,9 +468,11 @@ createApp({
 
         const screenOutput = computed(() => {
             const buffer = createBuffer();
+            const ctx = new Context(buffer, model);
             // 按照层级依次调用各自的 draw 方法
-            nodes.value.forEach(node => {
-                node.draw(buffer);
+            model.shapes.forEach(node => {
+                console.log(node);
+                node.draw(ctx);
             });
             return buffer.map(row => row.join('')).join('\n');
         });
@@ -523,7 +581,7 @@ createApp({
             currentGrid.value = { x: gx, y: gy };
 
             // 使用各自类定义的 isHit 逻辑
-            const hit = [...nodes.value].reverse().find(node => node.isHit(gx, gy));
+            const hit = [...model.shapes].reverse().find(node => node.isHit(gx, gy));
             selectedNodeId.value = hit ? hit.id : null;
         };
 
@@ -556,7 +614,7 @@ createApp({
         });
 
         return {
-            nodes, canvasWidth, canvasHeight, screenOutput,
+            model, canvasWidth, canvasHeight, screenOutput,
             selectedNodeId, selectedNode, selectionStyle, config,
             handlePositions, handleResizeStart,
             handleCanvasClick, currentGrid
