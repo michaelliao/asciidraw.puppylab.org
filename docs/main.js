@@ -148,6 +148,7 @@ const RESIZE_MAP = {
     'bl': [1, 0, -1, 1],  // 左下：改 x, w, h
     'bc': [0, 0, 0, 1],   // 中下：只改 h
     'br': [0, 0, 1, 1],   // 右下：只改 w 和 h
+    'move': [1, 1, 0, 0], // x, y 随 delta 改变，w, h 不变
 };
 
 /**
@@ -899,22 +900,32 @@ createApp({
 
                 if (node.type === 'Rect') {
                     const map = RESIZE_MAP[handleType];
+
+                    // 计算新坐标
                     let newX = initialData.x + deltaX * map[0];
                     let newY = initialData.y + deltaY * map[1];
                     let newW = initialData.w + deltaX * map[2];
                     let newH = initialData.h + deltaY * map[3];
 
-                    // 尺寸限制
-                    if (newW < 2) {
-                        if (map[0] === 1) newX = initialData.x + initialData.w - 2;
-                        newW = 2;
+                    // 移动模式下不需要尺寸限制，但如果是调整大小则需要
+                    if (handleType !== 'move') {
+                        if (newW < 2) {
+                            if (map[0] === 1) newX = initialData.x + initialData.w - 2;
+                            newW = 2;
+                        }
+                        if (newH < 2) {
+                            if (map[1] === 1) newY = initialData.y + initialData.h - 2;
+                            newH = 2;
+                        }
                     }
-                    if (newH < 2) {
-                        if (map[1] === 1) newY = initialData.y + initialData.h - 2;
-                        newH = 2;
-                    }
-                    node.x = newX; node.y = newY; node.w = newW; node.h = newH;
 
+                    node.x = newX;
+                    node.y = newY;
+                    node.w = newW;
+                    node.h = newH;
+
+                    // 特别提示：因为 Line 的 getEffectiveCoords 应该是实时计算的
+                    // 所以只要 Rect 坐标变了，吸附在该 Rect 上的 Line 会在下一帧自动重绘到新位置
                 } else if (node.type === 'Line') {
                     const isStart = handleType === 'start';
                     // 1. 计算当前的原始目标位置

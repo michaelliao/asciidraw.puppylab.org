@@ -125,6 +125,20 @@
             transform: translate(-50%, -50%);
         }
 
+        /* 专门为中心拖拽点设计的样式 */
+        .handle-move {
+            left: 50%;
+            top: 50%;
+            width: 12px;
+            /* 稍微大一点，方便抓取 */
+            height: 12px;
+            cursor: move;
+            background: #ff9800;
+            /* 换个颜色区分调整大小和移动 */
+            border-radius: 50%;
+            /* 圆形显得更像是一个“把手” */
+        }
+
         /* 矩形 8 个点的布局 */
         .handle-tl {
             top: 0;
@@ -263,7 +277,7 @@
 
                 <div class="selection-box" :style="selectionStyle" v-if="selectedNode">
                     <template v-if="selectedNode.type === 'Rect'">
-                        <div v-for="p in ['tl','tc','tr','ml','mr','bl','bc','br']" :key="p"
+                        <div v-for="p in ['tl','tc','tr','ml','mr','bl','bc','br', 'move']" :key="p"
                             :class="['handle', 'handle-' + p]" @mousedown.stop="handleResizeStart($event, p)">
                         </div>
                     </template>
