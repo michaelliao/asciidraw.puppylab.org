@@ -189,7 +189,7 @@ class Shape {
     draw(buffer) { }
 
     // 返回 UI 遮罩范围：用于选择框
-    getBounds() { return { x: this.x, y: this.y, w: 1, h: 1 }; }
+    getBounds(model) { return { x: this.x, y: this.y, w: 1, h: 1 }; }
 }
 
 // 矩形类：
@@ -211,7 +211,7 @@ class Rectangle extends Shape {
         return gx >= this.x && gx < this.x + this.w && gy >= this.y && gy < this.y + this.h;
     }
 
-    getBounds() {
+    getBounds(model) {
         return { x: this.x, y: this.y, w: this.w, h: this.h };
     }
 
@@ -349,12 +349,15 @@ class Line extends Shape {
         return gx >= minX && gx <= maxX && gy >= minY && gy <= maxY;
     }
 
-    getBounds() {
+    getBounds(model) {
+        // 这里的 model 是可选的，为了兼容没有 model 传入的情况（比如刚创建时）
+        const { x1, y1, x2, y2 } = model ? this.getEffectiveCoords(model) : { x1: this.x, y1: this.y, x2: this.x2, y2: this.y2 };
+
         return {
-            x: Math.min(this.x, this.x2),
-            y: Math.min(this.y, this.y2),
-            w: Math.abs(this.x2 - this.x) + 1,
-            h: Math.abs(this.y2 - this.y) + 1
+            x: Math.min(x1, x2),
+            y: Math.min(y1, y2),
+            w: Math.abs(x2 - x1) + 1,
+            h: Math.abs(y2 - y1) + 1
         };
     }
 
@@ -447,6 +450,20 @@ createApp({
         model.shapes[4].alignY = 'top';
         model.shapes[4].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
 
+        const snapTarget = ref(null); // 存储当前吸附的目标信息 { x, y, nodeId, side }
+
+        // 计算属性：用于在 UI 上显示那个吸引人的“吸附圆点”
+        const snapStyle = computed(() => {
+            if (!snapTarget.value) return { display: 'none' };
+            return {
+                left: snapTarget.value.x * config.charW + 'px',
+                top: snapTarget.value.y * config.charH + 'px',
+                width: config.charW + 'px',
+                height: config.charH + 'px',
+                display: 'block'
+            };
+        });
+
         // 计算属性：当前选中的节点对象
         const selectedNode = computed(() =>
             model.shapes.find(n => n.id === selectedNodeId.value)
@@ -457,7 +474,7 @@ createApp({
             if (!selectedNode.value) {
                 return {};
             }
-            const bounds = selectedNode.value.getBounds();
+            const bounds = selectedNode.value.getBounds(model);
             return {
                 left: (bounds.x * config.charW) + 'px',
                 top: (bounds.y * config.charH) + 'px',
@@ -541,30 +558,66 @@ createApp({
                     node.x = newX; node.y = newY; node.w = newW; node.h = newH;
 
                 } else if (node.type === 'Line') {
-                    // 直线逻辑：直接更新对应端点的坐标
-                    if (handleType === 'start') {
-                        const targetX = initialData.x + deltaX;
-                        const targetY = initialData.y + deltaY;
+                    const isStart = handleType === 'start';
+                    // 1. 计算当前的原始目标位置
+                    let tx = (isStart ? initialData.x : initialData.x2) + deltaX;
+                    let ty = (isStart ? initialData.y : initialData.y2) + deltaY;
 
-                        // 只要不与终点重叠即可
-                        if (targetX !== node.x2 || targetY !== node.y2) {
-                            node.x = targetX;
-                            node.y = targetY;
-                        }
-                    } else if (handleType === 'end') {
-                        const targetX = initialData.x2 + deltaX;
-                        const targetY = initialData.y2 + deltaY;
+                    // 2. 探测吸附
+                    let bestSnap = null;
+                    let minOffset = 1; // 探测半径：1个字符以内触发
 
-                        // 只要不与起点重叠即可
-                        if (targetX !== node.x || targetY !== node.y) {
-                            node.x2 = targetX;
-                            node.y2 = targetY;
-                        }
+                    model.shapes.forEach(s => {
+                        if (s.type !== 'Rect') return;
+
+                        // 互斥检查：获取另一个端点的绑定信息
+                        const otherBinding = isStart ? node.endBinding : node.startBinding;
+
+                        const { x, y, w, h } = s.getBounds();
+                        const midPoints = [
+                            { x: x + Math.floor(w / 2), y: y, side: 'top' },
+                            { x: x + Math.floor(w / 2), y: y + h - 1, side: 'bottom' },
+                            { x: x, y: y + Math.floor(h / 2), side: 'left' },
+                            { x: x + w - 1, y: y + Math.floor(h / 2), side: 'right' }
+                        ];
+
+                        midPoints.forEach(p => {
+                            // 如果另一个端点已经绑在这个矩形的这条边上，跳过
+                            if (otherBinding.nodeId === s.id && otherBinding.side === p.side) return;
+
+                            const dist = Math.sqrt(Math.pow(tx - p.x, 2) + Math.pow(ty - p.y, 2));
+                            if (dist < minOffset) {
+                                bestSnap = { ...p, nodeId: s.id };
+                                minOffset = dist;
+                            }
+                        });
+                    });
+
+                    // 3. 应用吸附或自由移动
+                    const currentBinding = isStart ? node.startBinding : node.endBinding;
+                    if (bestSnap) {
+                        tx = bestSnap.x;
+                        ty = bestSnap.y;
+                        currentBinding.nodeId = bestSnap.nodeId;
+                        currentBinding.side = bestSnap.side;
+                        snapTarget.value = bestSnap; // 激活高亮
+                    } else {
+                        currentBinding.nodeId = null;
+                        currentBinding.side = null;
+                        snapTarget.value = null;
+                    }
+
+                    // 更新坐标（若是绑定的，坐标会在 draw 时被 getEffectiveCoords 覆盖，但这里保留值有助于断开连接后的位置）
+                    if (isStart) {
+                        node.x = tx; node.y = ty;
+                    } else {
+                        node.x2 = tx; node.y2 = ty;
                     }
                 }
             };
 
             const onMouseUp = () => {
+                snapTarget.value = null; // 清除高亮
                 window.removeEventListener('mousemove', onMouseMove);
                 window.removeEventListener('mouseup', onMouseUp);
             };
@@ -615,7 +668,7 @@ createApp({
 
         return {
             model, canvasWidth, canvasHeight, screenOutput,
-            selectedNodeId, selectedNode, selectionStyle, config,
+            selectedNodeId, selectedNode, selectionStyle, snapStyle, config,
             handlePositions, handleResizeStart,
             handleCanvasClick, currentGrid
         };

@@ -102,6 +102,18 @@
             z-index: 9999;
         }
 
+        .snap-indicator {
+            position: absolute;
+            pointer-events: none;
+            background: rgba(59, 130, 246, 0.4);
+            /* 蓝色半透明 */
+            border: 2px solid #3b82f6;
+            border-radius: 50%;
+            transform: scale(1.5);
+            /* 稍微比字符大一点点，更有引导感 */
+            z-index: 10000;
+        }
+
         .handle {
             position: absolute;
             width: 8px;
@@ -246,6 +258,8 @@
 
                 <pre id="ascii-container"
                     class="absolute inset-0 pointer-events-none select-none text-white whitespace-pre">{{ screenOutput }}</pre>
+
+                <div class="snap-indicator" :style="snapStyle"></div>
 
                 <div class="selection-box" :style="selectionStyle" v-if="selectedNode">
                     <template v-if="selectedNode.type === 'Rect'">
