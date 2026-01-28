@@ -545,89 +545,92 @@ class Line extends Shape {
         console.log(`_calculatePath: (${x1},${y1}, ${startSide}) to (${x2},${y2}, ${endSide})`);
         let path = [{ x: x1, y: y1 }];
 
-        const dx = x2 - x1;
-        const dy = y2 - y1;
+        const getDir = (side) => {
+            if (side === 'left') return { dx: -1, dy: 0 };
+            if (side === 'right') return { dx: 1, dy: 0 };
+            if (side === 'top') return { dx: 0, dy: -1 };
+            if (side === 'bottom') return { dx: 0, dy: 1 };
+            return null;
+        };
 
-        // --- 场景 1: 水平面对面 (Right -> Left) ---
+        const sDir = getDir(startSide);
+        const eDir = getDir(endSide);
+
+        // --- 1. 尝试直接交点法 (2段 L-型) ---
+        if (sDir && eDir && (sDir.dx === 0) !== (eDir.dx === 0)) {
+            const intersectX = sDir.dx === 0 ? x1 : x2;
+            const intersectY = sDir.dx === 0 ? y2 : y1;
+
+            const isStartForward = sDir.dx !== 0
+                ? Math.sign(intersectX - x1) === sDir.dx
+                : Math.sign(intersectY - y1) === sDir.dy;
+
+            // 核心修正：不仅要方向正确，还要保证最后一段有足够的正向空间（至少1格逃逸距离）
+            const endDist = eDir.dx !== 0 ? (x2 - intersectX) * (-eDir.dx) : (y2 - intersectY) * (-eDir.dy);
+            const isEndForward = endDist >= 1; // 必须从正面撞击，且距离至少为1
+
+            if (isStartForward && isEndForward) {
+                path.push({ x: intersectX, y: intersectY });
+                path.push({ x: x2, y: y2 });
+                const r = this._finalizePath(path);
+                console.log(`_calculatePath result: ${JSON.stringify(r)}`);
+                return r;
+            }
+        }
+
+        // --- 2. 面对面冲突判定 (3段 vs 5段) ---
+        // 如果是 Right -> Left 这种面对面
         if (startSide === 'right' && endSide === 'left') {
-            if (dx >= 2) {
-                // 距离足够: 3段式，中点拐弯
-                const midX = Math.floor(x1 + dx / 2);
-                path.push({ x: midX, y: y1 });
-                path.push({ x: midX, y: y2 });
-            } else {
-                // 距离不足: 5段式，向外绕路
-                const escapeX = x1 + 1;
-                const entryX = x2 - 1;
-                const midY = Math.floor(y1 + dy / 2);
-                path.push({ x: escapeX, y: y1 });
-                path.push({ x: escapeX, y: midY });
-                path.push({ x: entryX, y: midY });
-                path.push({ x: entryX, y: y2 });
+            if (x2 - x1 >= 2) { // 空间足够
+                const midX = Math.floor((x1 + x2) / 2);
+                path.push({ x: midX, y: y1 }, { x: midX, y: y2 });
+            } else { // 空间不足，5段绕路
+                const midY = Math.floor((y1 + y2) / 2);
+                path.push({ x: x1 + 1, y: y1 }, { x: x1 + 1, y: midY }, { x: x2 - 1, y: midY }, { x: x2 - 1, y: y2 });
             }
         }
-        // --- 场景 2: 水平面对面 (Left -> Right) ---
         else if (startSide === 'left' && endSide === 'right') {
-            if (dx <= -2) {
-                // 距离足够: 3段式
-                const midX = Math.floor(x1 + dx / 2);
-                path.push({ x: midX, y: y1 });
-                path.push({ x: midX, y: y2 });
+            if (x1 - x2 >= 2) {
+                const midX = Math.floor((x1 + x2) / 2);
+                path.push({ x: midX, y: y1 }, { x: midX, y: y2 });
             } else {
-                // 距离不足: 5段式
-                const escapeX = x1 - 1;
-                const entryX = x2 + 1;
-                const midY = Math.floor(y1 + dy / 2);
-                path.push({ x: escapeX, y: y1 });
-                path.push({ x: escapeX, y: midY });
-                path.push({ x: entryX, y: midY });
-                path.push({ x: entryX, y: y2 });
+                const midY = Math.floor((y1 + y2) / 2);
+                path.push({ x: x1 - 1, y: y1 }, { x: x1 - 1, y: midY }, { x: x2 + 1, y: midY }, { x: x2 + 1, y: y2 });
             }
         }
-        // --- 场景 3: 垂直面对面 (Bottom -> Top) ---
+        // ... 同样逻辑处理 Top/Bottom 面对面 ...
         else if (startSide === 'bottom' && endSide === 'top') {
-            if (dy >= 2) {
-                const midY = Math.floor(y1 + dy / 2);
-                path.push({ x: x1, y: midY });
-                path.push({ x: x2, y: midY });
+            if (y2 - y1 >= 2) {
+                const midY = Math.floor((y1 + y2) / 2);
+                path.push({ x: x1, y: midY }, { x: x2, y: midY });
             } else {
-                const escapeY = y1 + 1;
-                const entryY = y2 - 1;
-                const midX = Math.floor(x1 + dx / 2);
-                path.push({ x: x1, y: escapeY });
-                path.push({ x: midX, y: escapeY });
-                path.push({ x: midX, y: entryY });
-                path.push({ x: x2, y: entryY });
+                const midX = Math.floor((x1 + x2) / 2);
+                path.push({ x: x1, y: y1 + 1 }, { x: midX, y: y1 + 1 }, { x: midX, y: y2 - 1 }, { x: x2, y: y2 - 1 });
             }
         }
-        // --- 场景 4: 垂直面对面 (Top -> Bottom) ---
         else if (startSide === 'top' && endSide === 'bottom') {
-            if (dy <= -2) {
-                const midY = Math.floor(y1 + dy / 2);
-                path.push({ x: x1, y: midY });
-                path.push({ x: x2, y: midY });
+            if (y1 - y2 >= 2) {
+                const midY = Math.floor((y1 + y2) / 2);
+                path.push({ x: x1, y: midY }, { x: x2, y: midY });
             } else {
-                const escapeY = y1 - 1;
-                const entryY = y2 + 1;
-                const midX = Math.floor(x1 + dx / 2);
-                path.push({ x: x1, y: escapeY });
-                path.push({ x: midX, y: escapeY });
-                path.push({ x: midX, y: entryY });
-                path.push({ x: x2, y: entryY });
+                const midX = Math.floor((x1 + x2) / 2);
+                path.push({ x: x1, y: y1 - 1 }, { x: midX, y: y1 - 1 }, { x: midX, y: y2 + 1 }, { x: x2, y: y2 + 1 });
             }
         }
-        // --- 场景 5: 默认情况 (非冲突方向或自由端点) ---
+        // --- 3. 兜底逻辑：通用四段式 (满足无法直接交点的正交情况) ---
         else {
-            // 遵循“先满足起点方向，再满足终点方向”
-            if (startSide === 'left' || startSide === 'right') {
-                path.push({ x: x2, y: y1 });
-            } else if (startSide === 'top' || startSide === 'bottom') {
-                path.push({ x: x1, y: y2 });
-            } else if (endSide === 'left' || endSide === 'right') {
-                path.push({ x: x1, y: y2 });
-            } else {
-                path.push({ x: x2, y: y1 });
+            let currX = x1 + (sDir ? sDir.dx : 0);
+            let currY = y1 + (sDir ? sDir.dy : 0);
+            path.push({ x: currX, y: currY });
+
+            let targetX = x2 + (eDir ? eDir.dx : 0);
+            let targetY = y2 + (eDir ? eDir.dy : 0);
+
+            if (currX !== targetX && currY !== targetY) {
+                if (sDir && sDir.dx === 0) path.push({ x: targetX, y: currY });
+                else path.push({ x: currX, y: targetY });
             }
+            path.push({ x: targetX, y: targetY });
         }
 
         path.push({ x: x2, y: y2 });
@@ -636,11 +639,34 @@ class Line extends Shape {
         return r;
     }
 
-    // 辅助方法：去重和清理
     _finalizePath(path) {
-        return path.filter((p, i) => i === 0 || p.x !== path[i - 1].x || p.y !== path[i - 1].y);
-    }
+        if (path.length < 2) return path;
 
+        // 第一步：去重（坐标完全相同的点）
+        let uniquePoints = path.filter((p, i) =>
+            i === 0 || p.x !== path[i - 1].x || p.y !== path[i - 1].y
+        );
+
+        // 第二步：合并共线点（优化三点一线）
+        let finalPath = [];
+        for (let i = 0; i < uniquePoints.length; i++) {
+            const prev = finalPath[finalPath.length - 1];
+            const curr = uniquePoints[i];
+            const next = uniquePoints[i + 1];
+
+            if (prev && next) {
+                // 检查 prev -> curr -> next 是否在同一水平线或垂直线上
+                const isHorizontal = prev.y === curr.y && curr.y === next.y;
+                const isVertical = prev.x === curr.x && curr.x === next.x;
+                if (isHorizontal || isVertical) {
+                    continue; // 跳过当前的 curr，直接连接 prev 和 next
+                }
+            }
+            finalPath.push(curr);
+        }
+
+        return finalPath;
+    }
     _drawSegment(buffer, px1, py1, px2, py2, charset) {
         const dx = px2 - px1;
         const dy = py2 - py1;
