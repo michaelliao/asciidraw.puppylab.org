@@ -543,91 +543,91 @@ class Line extends Shape {
 
     _calculatePath(x1, y1, x2, y2, startSide, endSide) {
         console.log(`_calculatePath: (${x1},${y1}, ${startSide}) to (${x2},${y2}, ${endSide})`);
-        const path = [{ x: x1, y: y1 }];
+        let path = [{ x: x1, y: y1 }];
 
-        // 1. 定义辅助判定
-        const isStartHoriz = (startSide === 'left' || startSide === 'right');
-        const isEndHoriz = (endSide === 'left' || endSide === 'right');
+        const dx = x2 - x1;
+        const dy = y2 - y1;
 
-        // 2. 针对【水平面对面】且【空间不足】的 5 段特殊处理 (Right -> Left)
+        // --- 场景 1: 水平面对面 (Right -> Left) ---
         if (startSide === 'right' && endSide === 'left') {
-            if (x2 - x1 < 2) {
-                // 空间不足，强制绕路
-                const offset = 1;
-                const escapeX = x1 + offset;   // 起点向右逃逸
-                const entryX = x2 - offset;    // 终点向左逃逸
-                const midY = (y1 + y2) / 2;    // 在 Y 的中间转弯
-
+            if (dx >= 2) {
+                // 距离足够: 3段式，中点拐弯
+                const midX = Math.floor(x1 + dx / 2);
+                path.push({ x: midX, y: y1 });
+                path.push({ x: midX, y: y2 });
+            } else {
+                // 距离不足: 5段式，向外绕路
+                const escapeX = x1 + 1;
+                const entryX = x2 - 1;
+                const midY = Math.floor(y1 + dy / 2);
                 path.push({ x: escapeX, y: y1 });
-                path.push({ x: escapeX, y: Math.round(midY) });
-                path.push({ x: entryX, y: Math.round(midY) });
+                path.push({ x: escapeX, y: midY });
+                path.push({ x: entryX, y: midY });
                 path.push({ x: entryX, y: y2 });
-                path.push({ x: x2, y: y2 });
-                return this._finalizePath(path);
             }
         }
-
-        // 3. 针对【水平面对面】且【空间不足】的 5 段特殊处理 (Left -> Right)
-        if (startSide === 'left' && endSide === 'right') {
-            if (x1 - x2 < 2) {
-                const offset = 1;
-                const escapeX = x1 - offset;
-                const entryX = x2 + offset;
-                const midY = (y1 + y2) / 2;
-
+        // --- 场景 2: 水平面对面 (Left -> Right) ---
+        else if (startSide === 'left' && endSide === 'right') {
+            if (dx <= -2) {
+                // 距离足够: 3段式
+                const midX = Math.floor(x1 + dx / 2);
+                path.push({ x: midX, y: y1 });
+                path.push({ x: midX, y: y2 });
+            } else {
+                // 距离不足: 5段式
+                const escapeX = x1 - 1;
+                const entryX = x2 + 1;
+                const midY = Math.floor(y1 + dy / 2);
                 path.push({ x: escapeX, y: y1 });
-                path.push({ x: escapeX, y: Math.round(midY) });
-                path.push({ x: entryX, y: Math.round(midY) });
+                path.push({ x: escapeX, y: midY });
+                path.push({ x: entryX, y: midY });
                 path.push({ x: entryX, y: y2 });
-                path.push({ x: x2, y: y2 });
-                return this._finalizePath(path);
             }
         }
-
-        // 4. 针对【垂直面对面】且【空间不足】的处理 (Bottom -> Top)
-        if (startSide === 'bottom' && endSide === 'top') {
-            if (y2 - y1 < 2) {
-                const offset = 1;
-                const escapeY = y1 + offset;
-                const entryY = y2 - offset;
-                const midX = (x1 + x2) / 2;
-
+        // --- 场景 3: 垂直面对面 (Bottom -> Top) ---
+        else if (startSide === 'bottom' && endSide === 'top') {
+            if (dy >= 2) {
+                const midY = Math.floor(y1 + dy / 2);
+                path.push({ x: x1, y: midY });
+                path.push({ x: x2, y: midY });
+            } else {
+                const escapeY = y1 + 1;
+                const entryY = y2 - 1;
+                const midX = Math.floor(x1 + dx / 2);
                 path.push({ x: x1, y: escapeY });
-                path.push({ x: Math.round(midX), y: escapeY });
-                path.push({ x: Math.round(midX), y: entryY });
+                path.push({ x: midX, y: escapeY });
+                path.push({ x: midX, y: entryY });
                 path.push({ x: x2, y: entryY });
-                path.push({ x: x2, y: y2 });
-                return this._finalizePath(path);
             }
         }
-
-        // 5. 针对【垂直面对面】且【空间不足】的处理 (Top -> Bottom)
-        if (startSide === 'top' && endSide === 'bottom') {
-            if (y1 - y2 < 2) {
-                const offset = 1;
-                const escapeY = y1 - offset;
-                const entryY = y2 + offset;
-                const midX = (x1 + x2) / 2;
-
+        // --- 场景 4: 垂直面对面 (Top -> Bottom) ---
+        else if (startSide === 'top' && endSide === 'bottom') {
+            if (dy <= -2) {
+                const midY = Math.floor(y1 + dy / 2);
+                path.push({ x: x1, y: midY });
+                path.push({ x: x2, y: midY });
+            } else {
+                const escapeY = y1 - 1;
+                const entryY = y2 + 1;
+                const midX = Math.floor(x1 + dx / 2);
                 path.push({ x: x1, y: escapeY });
-                path.push({ x: Math.round(midX), y: escapeY });
-                path.push({ x: Math.round(midX), y: entryY });
+                path.push({ x: midX, y: escapeY });
+                path.push({ x: midX, y: entryY });
                 path.push({ x: x2, y: entryY });
-                path.push({ x: x2, y: y2 });
-                return this._finalizePath(path);
             }
         }
-
-        // 6. 通用逻辑：标准曼哈顿 (2段或3段)
-        if (isStartHoriz) {
-            // 起点水平限制：先走 X 再走 Y
-            path.push({ x: x2, y: y1 });
-        } else if (isEndHoriz) {
-            // 终点水平限制：先走 Y 再走 X
-            path.push({ x: x1, y: y2 });
-        } else {
-            // 自由端点：默认先水平后垂直
-            path.push({ x: x2, y: y1 });
+        // --- 场景 5: 默认情况 (非冲突方向或自由端点) ---
+        else {
+            // 遵循“先满足起点方向，再满足终点方向”
+            if (startSide === 'left' || startSide === 'right') {
+                path.push({ x: x2, y: y1 });
+            } else if (startSide === 'top' || startSide === 'bottom') {
+                path.push({ x: x1, y: y2 });
+            } else if (endSide === 'left' || endSide === 'right') {
+                path.push({ x: x1, y: y2 });
+            } else {
+                path.push({ x: x2, y: y1 });
+            }
         }
 
         path.push({ x: x2, y: y2 });
