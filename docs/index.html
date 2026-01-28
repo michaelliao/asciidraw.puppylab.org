@@ -237,13 +237,17 @@
                 class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
                 <i data-lucide="arrow-up-right" class="w-5 h-5"></i>
             </button>
-            <button 
-             title="Text"  @click="addShape('rect', {transparent:true, text:'Text Box', style:'none'})"
-            class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button title="Text" @click="addShape('rect', {transparent:true, text:'Text Box', style:'none'})"
+                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
                 <i data-lucide="type" class="w-5 h-5"></i>
             </button>
             <div class="h-6 w-px bg-gray-600 mx-2"></div>
-            <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Delete">
+            <button title="Delete" @click="deleteSelectedShape" :disabled="!selectedNodeId" :class="[
+                'px-3 py-1 rounded text-sm transition flex items-center justify-center',
+                selectedNodeId 
+                    ? 'bg-red-600/80 hover:bg-red-500 text-white' 
+                    : 'bg-[#333] text-gray-600 opacity-50'
+                ]">
                 <i data-lucide="trash-2" class="w-5 h-5"></i>
             </button>
             <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Undo">

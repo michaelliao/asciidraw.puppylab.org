@@ -928,6 +928,24 @@ createApp({
             }
         };
 
+        // 删除当前选中的节点
+        const deleteSelectedShape = () => {
+            if (!selectedNodeId.value) return;
+
+            // 找到当前选中项在数组中的索引
+            const index = model.shapes.findIndex(s => s.id === selectedNodeId.value);
+
+            if (index !== -1) {
+                // 从数组中移除
+                model.shapes.splice(index, 1);
+
+                // 关键：删除后清空选中状态
+                selectedNodeId.value = null;
+
+                console.log("Shape deleted");
+            }
+        };
+
         const downloadFile = () => {
             // 1. 构造 JSON 数据结构
             const data = {
@@ -1146,7 +1164,7 @@ createApp({
         });
 
         return {
-            model, canvasWidth, canvasHeight, screenOutput, copyToClipboard, downloadFile,
+            model, canvasWidth, canvasHeight, screenOutput, copyToClipboard, downloadFile, deleteSelectedShape,
             addShape, scrollContainer, selectedNodeId, selectedNode, selectionStyle, snapStyle, config,
             handlePositions, handleResizeStart,
             handleCanvasClick, currentGrid
