@@ -1,9 +1,7 @@
 const { createApp, ref, computed, onMounted, nextTick, reactive } = Vue;
 
-const canvasWidth = 2000;
-const canvasHeight = 1000;
-const ROWS = 500;
-const COLS = 200;
+const ROWS = 200;
+const COLS = 400;
 
 // 定义字符集映射
 const CHAR_STYLES = {
@@ -158,8 +156,6 @@ class Context {
     constructor(buffer, model) {
         this.buffer = buffer; // 二维数组
         this.model = model;   // 指向 Model 实例
-        this.rows = buffer.length;
-        this.cols = buffer[0].length;
     }
 }
 
@@ -773,6 +769,14 @@ createApp({
         model.shapes[4].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
 
         const snapTarget = ref(null); // 存储当前吸附的目标信息 { x, y, nodeId, side }
+
+        const canvasWidth = computed(() => {
+            return config.charW * COLS;
+        });
+
+        const canvasHeight = computed(() => {
+            return config.charH * ROWS;
+        });
 
         // 计算属性：用于在 UI 上显示那个吸引人的“吸附圆点”
         const snapStyle = computed(() => {
