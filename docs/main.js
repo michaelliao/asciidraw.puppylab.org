@@ -164,7 +164,7 @@ class Context {
  */
 class Model {
     constructor(config) {
-        this.shapes = reactive([]); // 存放 Rectangle, Line 等
+        this.shapes = reactive([]); // 存放 Rect, Line 等
         this.config = config;
     }
 
@@ -207,18 +207,22 @@ class Shape {
 }
 
 // 矩形类：
-class Rectangle extends Shape {
+class Rect extends Shape {
 
-    constructor(x, y, w, h, transparent = true) {
+    constructor(x, y, w, h, props = {}) {
         super('Rect', x, y);
         this.w = w;
         this.h = h;
-        this.transparent = transparent;
-        // 文本相关属性
+
+        // 默认属性:
+        this.transparent = false;
         this.text = "";
         this.alignX = 'center'; // 'left', 'center', 'right'
         this.alignY = 'center'; // 'top', 'center', 'bottom'
         this.wrap = true;       // 是否自动折行
+
+        // 合并外部传入的属性 (覆盖默认值)
+        Object.assign(this, props);
     }
 
     toJSON() {
@@ -241,7 +245,7 @@ class Rectangle extends Shape {
         return { x: this.x, y: this.y, w: this.w, h: this.h };
     }
 
-    // 在 Rectangle 类中添加处理文本的方法
+    // 在 Rect 类中添加处理文本的方法
     layoutText() {
         if (!this.text) return [];
         // 如果没有边框，填充为 0；否则为 2（左右或上下之和）
@@ -359,7 +363,7 @@ class Rectangle extends Shape {
 
 // 直线类 (目前支持简单正交线或斜线)
 class Line extends Shape {
-    constructor(x1, y1, x2, y2) {
+    constructor(x1, y1, x2, y2, props) {
         super('Line', x1, y1);
         this.x2 = x2;
         this.y2 = y2;
@@ -367,7 +371,10 @@ class Line extends Shape {
         this.endBinding = { nodeId: null, side: null };
         // 样式属性
         this.startStyle = 'normal'; // 'normal' | 'arrow'
-        this.endStyle = 'arrow';   // 默认给终点加个箭头比较直观
+        this.endStyle = 'normal';
+
+        // 合并外部传入的属性 (覆盖默认值)
+        Object.assign(this, props);
     }
 
     toJSON() {
@@ -750,11 +757,11 @@ createApp({
 
         const model = new Model(config);
         model.shapes.push(
-            new Rectangle(3, 1, 5, 3),
-            new Rectangle(24, 5, 10, 5),
-            new Rectangle(37, 3, 20, 12),
-            new Rectangle(62, 3, 29, 9),
-            new Rectangle(62, 13, 29, 9),
+            new Rect(3, 1, 5, 3),
+            new Rect(24, 5, 10, 5),
+            new Rect(37, 3, 20, 12),
+            new Rect(62, 3, 29, 9),
+            new Rect(62, 13, 29, 9),
             new Line(5, 5, 5, 12),   // 垂直线
             new Line(40, 20, 60, 20) // 水平线
         )
@@ -768,6 +775,7 @@ createApp({
         model.shapes[4].alignY = 'top';
         model.shapes[4].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
 
+        const scrollContainer = ref(null);
         const snapTarget = ref(null); // 存储当前吸附的目标信息 { x, y, nodeId, side }
 
         const canvasWidth = computed(() => {
@@ -870,6 +878,53 @@ createApp({
                 console.log("Copied to clipboard with cropping!");
             } catch (err) {
                 console.error("Failed to copy to clipboard:", err);
+            }
+        };
+
+        const addShape = (type, props = {}) => {
+            // 1. 确定当前视口的中点坐标 (Grid 坐标)
+            // 需要考虑滚动条的偏移量
+            const container = scrollContainer.value; // 指向 <section> 的 ref
+            const scrollLeft = container ? container.scrollLeft : 0;
+            const scrollTop = container ? container.scrollTop : 0;
+            const viewW = container ? container.clientWidth : window.innerWidth;
+            const viewH = container ? container.clientHeight : window.innerHeight;
+
+            // 计算相对于画布原点的像素中点，然后转为网格坐标
+            const centerX = Math.floor((scrollLeft + viewW / 2) / config.charW);
+            const centerY = Math.floor((scrollTop + viewH / 2) / config.charH);
+
+            let newShape = null;
+
+            // 2. 工厂模式创建 Shape
+            if (type.toLowerCase() === 'rect') {
+                const w = 21;
+                const h = 5;
+                // 修正坐标，让 (centerX, centerY) 成为矩形的中心
+                newShape = new Rect(
+                    centerX - Math.floor(w / 2),
+                    centerY - Math.floor(h / 2),
+                    w,
+                    h,
+                    props // 合并额外属性，如 style: "bold"
+                );
+            }
+            else if (type.toLowerCase() === 'line') {
+                const length = 20;
+                // 创建一根长度为 20 的横线，中点在 (centerX, centerY)
+                newShape = new Line(
+                    centerX - Math.floor(length / 2),
+                    centerY,
+                    centerX + Math.floor(length / 2),
+                    centerY,
+                    props
+                );
+            }
+
+            // 3. 添加到 model 并选中它
+            if (newShape) {
+                model.shapes.push(newShape);
+                selectedNodeId.value = newShape.id; // 自动选中新创建的图形
             }
         };
 
@@ -1092,7 +1147,7 @@ createApp({
 
         return {
             model, canvasWidth, canvasHeight, screenOutput, copyToClipboard, downloadFile,
-            selectedNodeId, selectedNode, selectionStyle, snapStyle, config,
+            addShape, scrollContainer, selectedNodeId, selectedNode, selectionStyle, snapStyle, config,
             handlePositions, handleResizeStart,
             handleCanvasClick, currentGrid
         };
