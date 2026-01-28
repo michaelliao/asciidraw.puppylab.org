@@ -745,10 +745,13 @@ class Line extends Shape {
 }
 
 function initModel(model) {
+    let r1 = new Rect(3, 1, 26, 7, { text: "Welcome to ASCII Draw!" });
+    let r2 = new Rect(41, 1, 23, 7, { text: "Free & Open Source!\nby Crypto Michael\nversion: 1.0" });
+    let l1 = new Line(28, 4, 41, 4, { startBinding: { nodeId: r1.id, side: "right" }, endBinding: { nodeId: r2.id, side: "left" }, endStyle: "arrow" });
     model.shapes.push(
-        new Rect(3, 1, 61, 8, { text: "Welcome to ASCII Draw!\nversion: 1.0" }),
+        r1, r2, l1,
         new Line(3, 10, 63, 10),
-        new Rect(3, 12, 61, 3, { alignX: "left", style: "none", text: "ASCII Draw is OPEN SOURCE!\nAuthor: Crypto Michael\nGitHub: https://github.com/michaelliao/asciidraw.puppylab.org" })
+        new Rect(3, 13, 61, 3, { alignX: "left", style: "none", text: "ASCII Draw is OPEN SOURCE!\nAuthor: Crypto Michael\nGitHub: https://github.com/michaelliao/asciidraw.puppylab.org" })
     );
 }
 
