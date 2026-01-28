@@ -1,7 +1,7 @@
 const { createApp, ref, computed, onMounted, nextTick, reactive } = Vue;
 
 const canvasWidth = 2000;
-const canvasHeight = 4000;
+const canvasHeight = 1000;
 const ROWS = 500;
 const COLS = 200;
 
@@ -130,6 +130,21 @@ function createBuffer() {
     return Array(ROWS).fill().map(() => Array(COLS).fill(' '));
 }
 
+// 调整点的影响因子：[dx, dy, dw, dh]
+// dx, dy: 是否改变位置； dw, dh: 是否改变尺寸
+const RESIZE_MAP = {
+    'tl': [1, 1, -1, -1], // 左上：改 x,y，同时反向改 w,h
+    'tc': [0, 1, 0, -1],  // 中上：只改 y 和 h
+    'tr': [0, 1, 1, -1],  // 右上：改 y, w, h
+    'ml': [1, 0, -1, 0],  // 左中：改 x 和 w
+    'mr': [0, 0, 1, 0],   // 右中：只改 w
+    'bl': [1, 0, -1, 1],  // 左下：改 x, w, h
+    'bc': [0, 0, 0, 1],   // 中下：只改 h
+    'br': [0, 0, 1, 1],   // 右下：只改 w 和 h
+};
+
+
+
 // 基础图形类：
 class Shape {
     static #nextId = 0;
@@ -200,6 +215,7 @@ class Rectangle extends Shape {
         });
         return lines.slice(0, maxHeight);
     }
+
     draw(buffer) {
         const hasBorder = this.style !== 'none';
         const charset = hasBorder ? CHAR_STYLES[this.style] : null;
@@ -425,12 +441,78 @@ createApp({
         });
 
         const handleResizeStart = (e, handleType) => {
-            // 阻止默认行为（防止拖拽文字等）
             e.preventDefault();
+            e.stopPropagation();
 
-            console.log(`Started resizing/moving handle: ${handleType}`);
+            const node = selectedNode.value;
+            if (!node) return;
 
-            // 这里未来会记录初始位置，并挂载 window.onmousemove
+            // 记录初始鼠标位置
+            const startX = e.clientX;
+            const startY = e.clientY;
+
+            // 记录初始节点数据
+            let initialData = {};
+            if (node.type === 'Rect') {
+                initialData = { x: node.x, y: node.y, w: node.w, h: node.h };
+            } else if (node.type === 'Line') {
+                initialData = { x: node.x, y: node.y, x2: node.x2, y2: node.y2 };
+            }
+
+            const onMouseMove = (moveEvent) => {
+                // 计算鼠标移动的网格增量
+                const deltaX = Math.round((moveEvent.clientX - startX) / config.charW);
+                const deltaY = Math.round((moveEvent.clientY - startY) / config.charH);
+
+                if (node.type === 'Rect') {
+                    const map = RESIZE_MAP[handleType];
+                    let newX = initialData.x + deltaX * map[0];
+                    let newY = initialData.y + deltaY * map[1];
+                    let newW = initialData.w + deltaX * map[2];
+                    let newH = initialData.h + deltaY * map[3];
+
+                    // 尺寸限制
+                    if (newW < 2) {
+                        if (map[0] === 1) newX = initialData.x + initialData.w - 2;
+                        newW = 2;
+                    }
+                    if (newH < 2) {
+                        if (map[1] === 1) newY = initialData.y + initialData.h - 2;
+                        newH = 2;
+                    }
+                    node.x = newX; node.y = newY; node.w = newW; node.h = newH;
+
+                } else if (node.type === 'Line') {
+                    // 直线逻辑：直接更新对应端点的坐标
+                    if (handleType === 'start') {
+                        const targetX = initialData.x + deltaX;
+                        const targetY = initialData.y + deltaY;
+
+                        // 只要不与终点重叠即可
+                        if (targetX !== node.x2 || targetY !== node.y2) {
+                            node.x = targetX;
+                            node.y = targetY;
+                        }
+                    } else if (handleType === 'end') {
+                        const targetX = initialData.x2 + deltaX;
+                        const targetY = initialData.y2 + deltaY;
+
+                        // 只要不与起点重叠即可
+                        if (targetX !== node.x || targetY !== node.y) {
+                            node.x2 = targetX;
+                            node.y2 = targetY;
+                        }
+                    }
+                }
+            };
+
+            const onMouseUp = () => {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+            };
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
         };
 
         // 处理点击选中
@@ -476,7 +558,7 @@ createApp({
         return {
             nodes, canvasWidth, canvasHeight, screenOutput,
             selectedNodeId, selectedNode, selectionStyle, config,
-            handlePositions,
+            handlePositions, handleResizeStart,
             handleCanvasClick, currentGrid
         };
     }
