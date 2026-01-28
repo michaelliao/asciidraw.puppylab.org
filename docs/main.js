@@ -744,6 +744,14 @@ class Line extends Shape {
     }
 }
 
+function initModel(model) {
+    model.shapes.push(
+        new Rect(3, 1, 61, 8, { text: "Welcome to ASCII Draw!\nversion: 1.0" }),
+        new Line(3, 10, 63, 10),
+        new Rect(3, 12, 61, 3, { alignX: "left", style: "none", text: "ASCII Draw is OPEN SOURCE!\nAuthor: Crypto Michael\nGitHub: https://github.com/michaelliao/asciidraw.puppylab.org" })
+    );
+}
+
 createApp({
     setup() {
         // 响应式状态，存储测量后的精确数值
@@ -756,24 +764,8 @@ createApp({
         const currentGrid = ref({ x: 0, y: 0 });
 
         const model = new Model(config);
-        model.shapes.push(
-            new Rect(3, 1, 5, 3),
-            new Rect(24, 5, 10, 5),
-            new Rect(37, 3, 20, 12),
-            new Rect(62, 3, 29, 9),
-            new Rect(62, 13, 29, 9),
-            new Line(5, 5, 5, 12),   // 垂直线
-            new Line(40, 20, 60, 20) // 水平线
-        )
 
-        model.shapes[1].style = 'bold';
-        model.shapes[2].style = 'double';
-        model.shapes[2].transparent = false;
-        model.shapes[3].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
-        model.shapes[4].style = 'none';
-        model.shapes[4].alignX = 'left';
-        model.shapes[4].alignY = 'top';
-        model.shapes[4].text = "Hello, ASCII Draw!\nThis is a sample text. It should wrap properly.";
+        initModel(model);
 
         const scrollContainer = ref(null);
         const snapTarget = ref(null); // 存储当前吸附的目标信息 { x, y, nodeId, side }
