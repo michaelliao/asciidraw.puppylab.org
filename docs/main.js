@@ -248,6 +248,10 @@ class Rect extends Shape {
         return Rect.editables;
     }
 
+    toString(){
+        return `Rect: ${this.w} x ${this.h} at (${this.x}, ${this.y})`;
+    }
+
     toJSON() {
         let json = super.toJSON();
         json.w = this.w;
@@ -410,6 +414,10 @@ class Line extends Shape {
 
     getEditables() {
         return Line.editables;
+    }
+
+    toString(){
+        return `Line: (${this.x}, ${this.y}) - (${this.x2}, ${this.y2})`;
     }
 
     toJSON() {

@@ -350,7 +350,7 @@
         class="w-full h-auto flex-none border-t border-gray-700 bg-[#252525] px-3 py-1 overflow-hidden whitespace-nowrap text-xs text-gray-400">
         <div class="flex justify-between items-center">
             <div class="truncate">
-                <span>Selection: {{ selectedNode ? selectedNode.name : 'None' }}</span>
+                <span>Selection: {{ selectedNode ? selectedNode.toString() : 'None' }}</span>
             </div>
             <div class="flex-none ml-4 font-mono">
                 <span>Grid: {{ currentGrid.x }}, {{ currentGrid.y }}</span> | ASCII Mode | Saved at 2026-01-24 20:15:32
