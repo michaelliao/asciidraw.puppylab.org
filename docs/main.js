@@ -460,10 +460,10 @@ class Line extends Shape {
                 if (target && target.type === 'Rect') {
                     const { x, y, w, h } = target.getBounds();
                     switch (binding.side) {
-                        case 'top': return { x: x + Math.floor(w / 2), y: y, side: 'top' };
-                        case 'bottom': return { x: x + Math.floor(w / 2), y: y + h - 1, side: 'bottom' };
-                        case 'left': return { x: x, y: y + Math.floor(h / 2), side: 'left' };
-                        case 'right': return { x: x + w - 1, y: y + Math.floor(h / 2), side: 'right' };
+                        case 'top': return { x: x + Math.floor((w - 1) / 2), y: y, side: 'top' };
+                        case 'bottom': return { x: x + Math.floor((w - 1) / 2), y: y + h - 1, side: 'bottom' };
+                        case 'left': return { x: x, y: y + Math.floor((h - 1) / 2), side: 'left' };
+                        case 'right': return { x: x + w - 1, y: y + Math.floor((h - 1) / 2), side: 'right' };
                     }
                 }
             }
@@ -1085,8 +1085,8 @@ createApp({
                 const h = 5;
                 // 修正坐标，让 (centerX, centerY) 成为矩形的中心
                 newShape = new Rect(
-                    centerX - Math.floor(w / 2),
-                    centerY - Math.floor(h / 2),
+                    centerX - Math.floor((w + 1) / 2),
+                    centerY - Math.floor((h + 1) / 2),
                     w,
                     h,
                     props // 合并额外属性，如 style: "bold"
@@ -1119,6 +1119,8 @@ createApp({
             const index = model.shapes.findIndex(s => s.id === selectedNodeId.value);
 
             if (index !== -1) {
+                history.save();
+
                 // 从数组中移除
                 model.shapes.splice(index, 1);
 
@@ -1270,10 +1272,10 @@ createApp({
 
                         const { x, y, w, h } = s.getBounds();
                         const midPoints = [
-                            { x: x + Math.floor(w / 2), y: y, side: 'top' },
-                            { x: x + Math.floor(w / 2), y: y + h - 1, side: 'bottom' },
-                            { x: x, y: y + Math.floor(h / 2), side: 'left' },
-                            { x: x + w - 1, y: y + Math.floor(h / 2), side: 'right' }
+                            { x: x + Math.floor((w + 1) / 2), y: y, side: 'top' },
+                            { x: x + Math.floor((w + 1) / 2), y: y + h - 1, side: 'bottom' },
+                            { x: x, y: y + Math.floor((h + 1) / 2), side: 'left' },
+                            { x: x + w - 1, y: y + Math.floor((h + 1) / 2), side: 'right' }
                         ];
 
                         midPoints.forEach(p => {
