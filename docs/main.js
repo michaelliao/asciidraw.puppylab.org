@@ -1,4 +1,4 @@
-const { createApp, ref, computed, onMounted, nextTick, reactive } = Vue;
+const { createApp, ref, computed, onMounted, onUnmounted, nextTick, reactive } = Vue;
 
 const ROWS = 200;
 const COLS = 400;
@@ -793,7 +793,21 @@ class HistoryManager {
         this.factory = factory; // 用于实例化 shapes 的工厂函数
         this.undoStack = Vue.reactive([]);
         this.redoStack = Vue.reactive([]);
-        this.maxSteps = 50;
+        this.maxSteps = 100;
+
+        // 核心：记录最后一次保存时的快照字符串
+        this.lastSavedSnapshot = this._takeSnapshot();
+    }
+
+    // 判断当前状态是否与上次保存的状态不一致
+    isDirty() {
+        return this._takeSnapshot() !== this.lastSavedSnapshot;
+    }
+
+    // 当用户点击“下载”或“保存”成功后调用此方法
+    markClean() {
+        this.lastSavedSnapshot = this._takeSnapshot();
+        console.log("Model marked as clean.");
     }
 
     // 获取当前状态快照
@@ -1158,6 +1172,9 @@ createApp({
             URL.revokeObjectURL(url);
 
             console.log("File exported as unamed.asciidraw");
+
+            // 成功后，标记为干净
+            history.markClean();
         };
 
         const handlePositions = computed(() => {
@@ -1316,6 +1333,15 @@ createApp({
             selectedNodeId.value = hit ? hit.id : null;
         };
 
+        const handleBeforeUnload = (e) => {
+            if (history.isDirty()) {
+                // 现代浏览器中，自定义文本通常不会显示，
+                // 而是显示浏览器默认的“系统可能不会保存您所做的更改”
+                e.preventDefault();
+                e.returnValue = ''; // Chrome 必须设置 returnValue
+            }
+        };
+
         onMounted(() => {
             // 精确测量逻辑
             const tester = document.createElement('span');
@@ -1342,6 +1368,12 @@ createApp({
             document.body.removeChild(tester);
 
             lucide.createIcons();
+
+            window.addEventListener('beforeunload', handleBeforeUnload);
+        });
+
+        onUnmounted(() => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
         });
 
         return {
