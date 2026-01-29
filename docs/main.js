@@ -535,7 +535,7 @@ class Line extends Shape {
 
         // 4. 处理终点装饰
         if (this.endStyle === 'arrow') {
-            const side = endSide || this._getMarkerSide(false, points[points.length - 2], points[points.length - 1]);
+            const side = endSide || this._getMarkerSide(false, points[points.length - 1], points[points.length - 2]);
             this._drawMarker(buffer, x2, y2, side);
         } else {
             // 如果是 normal，补全终点缺失的那一格线
@@ -765,15 +765,15 @@ class Line extends Shape {
 
         if (isStart) {
             // 起点箭头：方向与离开点的向量相反
-            if (dx > 0) return 'left';
-            if (dx < 0) return 'right';
-            if (dy > 0) return 'top';
+            if (dx < 0) return 'left';
+            if (dx > 0) return 'right';
+            if (dy < 0) return 'top';
             return 'bottom';
         } else {
             // 终点箭头：方向指向目标
-            if (dx > 0) return 'left';   // 从左往右指，吸附在左语义
-            if (dx < 0) return 'right';
-            if (dy > 0) return 'top';
+            if (dx < 0) return 'left';   // 从左往右指，吸附在左语义
+            if (dx > 0) return 'right';
+            if (dy < 0) return 'top';
             return 'bottom';
         }
     }
