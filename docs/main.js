@@ -173,12 +173,22 @@ class Model {
     }
 }
 
+// 定义可编辑的属性:
+class Editable {
+    constructor(name, propName, type, enums = []) {
+        this.name = name;
+        this.propName = propName;
+        this.type = type;
+        this.enums = enums;
+    }
+}
+
 // 基础图形类：
 class Shape {
-    static #nextId = 0;
+    static _nextId = 0;
 
     constructor(type, x, y) {
-        this.id = ++Shape.#nextId;
+        this.id = ++Shape._nextId;
         this.type = type;
         this.x = x;
         this.y = y;
@@ -209,6 +219,15 @@ class Shape {
 // 矩形类：
 class Rect extends Shape {
 
+    static editables = [
+        new Editable("Name", "name", "text"),
+        new Editable("Style", "style", "select", ['normal', 'bold', 'double']),
+        new Editable("Transparent", "transparent", "checkbox"),
+        new Editable("Horizontal Align", "alignX", "select", ['left', 'center', 'right']),
+        new Editable("Vertical Align", "alignY", "select", ['top', 'center', 'bottom']),
+        new Editable("Text", "text", "textarea"),
+    ];
+
     constructor(x, y, w, h, props = {}) {
         super('Rect', x, y);
         this.w = w;
@@ -223,6 +242,10 @@ class Rect extends Shape {
 
         // 合并外部传入的属性 (覆盖默认值)
         Object.assign(this, props);
+    }
+
+    getEditables() {
+        return Rect.editables;
     }
 
     toJSON() {
@@ -361,8 +384,16 @@ class Rect extends Shape {
     }
 }
 
-// 直线类 (目前支持简单正交线或斜线)
+// 直线类：
 class Line extends Shape {
+
+    static editables = [
+        new Editable("Name", "name", "text"),
+        new Editable("Style", "style", "select", ['normal', 'bold', 'double']),
+        new Editable("Start Point", "startStyle", "select", ["normal", "arrow"]),
+        new Editable("End Point", "endStyle", "select", ["normal", "arrow"])
+    ];
+
     constructor(x1, y1, x2, y2, props) {
         super('Line', x1, y1);
         this.x2 = x2;
@@ -375,6 +406,10 @@ class Line extends Shape {
 
         // 合并外部传入的属性 (覆盖默认值)
         Object.assign(this, props);
+    }
+
+    getEditables() {
+        return Line.editables;
     }
 
     toJSON() {
@@ -745,9 +780,9 @@ class Line extends Shape {
 }
 
 function initModel(model) {
-    let r1 = new Rect(3, 1, 26, 7, { text: "Welcome to ASCII Draw!" });
+    let r1 = new Rect(3, 1, 26, 7, { text: "Welcome to ASCII Draw!", name: "Welcome" });
     let r2 = new Rect(41, 1, 23, 7, { text: "Free & Open Source!\nby Crypto Michael\nversion: 1.0" });
-    let l1 = new Line(28, 4, 41, 4, { startBinding: { nodeId: r1.id, side: "right" }, endBinding: { nodeId: r2.id, side: "left" }, endStyle: "arrow" });
+    let l1 = new Line(28, 4, 41, 4, { name: "Connector", startBinding: { nodeId: r1.id, side: "right" }, endBinding: { nodeId: r2.id, side: "left" }, endStyle: "arrow" });
     model.shapes.push(
         r1, r2, l1,
         new Line(3, 10, 63, 10),
@@ -771,7 +806,12 @@ createApp({
         initModel(model);
 
         const scrollContainer = ref(null);
-        const snapTarget = ref(null); // 存储当前吸附的目标信息 { x, y, nodeId, side }
+
+        // 记录正在拖拽的项目索引
+        const dragIndex = ref(null);
+
+        // 存储当前吸附的目标信息 { x, y, nodeId, side }
+        const snapTarget = ref(null);
 
         const canvasWidth = computed(() => {
             return config.charW * COLS;
@@ -780,6 +820,36 @@ createApp({
         const canvasHeight = computed(() => {
             return config.charH * ROWS;
         });
+
+        // UI展示用的列表（反转顺序：大索引在上）
+        const displayShapes = computed(() => {
+            return [...model.shapes].reverse();
+        });
+
+        const handleDragStart = (index) => {
+            // index 是 displayShapes 的索引，需要转换回 model.shapes 的原始索引
+            dragIndex.value = (model.shapes.length - 1) - index;
+        };
+
+        const handleDragOver = (e) => {
+            e.preventDefault(); // 必须阻止默认行为以允许 drop
+        };
+
+        const handleDrop = (index) => {
+            const fromIndex = dragIndex.value;
+            const toIndex = (model.shapes.length - 1) - index;
+
+            if (fromIndex === toIndex) return;
+
+            // 执行重排序
+            const item = model.shapes.splice(fromIndex, 1)[0];
+            model.shapes.splice(toIndex, 0, item);
+
+            dragIndex.value = null;
+
+            // 强制更新视图（如果 model 不是响应式的）
+            // model.shapes = [...model.shapes]; 
+        };
 
         // 计算属性：用于在 UI 上显示那个吸引人的“吸附圆点”
         const snapStyle = computed(() => {
@@ -939,6 +1009,16 @@ createApp({
 
                 console.log("Shape deleted");
             }
+        };
+
+        const getShapeIcon = (node) => {
+            if (node.type === 'Rect') {
+                return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="square" aria-hidden="true" class="lucide lucide-square w-3 h-3"><rect width="18" height="18" x="3" y="3" rx="2"></rect></svg>`
+            }
+            if (node.type === 'Line') {
+                return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="minus" aria-hidden="true" class="lucide lucide-minus w-3 h-3"><path d="M5 12h14"></path></svg>`;
+            }
+            return '';
         };
 
         const downloadFile = () => {
@@ -1159,10 +1239,15 @@ createApp({
         });
 
         return {
-            model, canvasWidth, canvasHeight, screenOutput, copyToClipboard, downloadFile, deleteSelectedShape,
-            addShape, scrollContainer, selectedNodeId, selectedNode, selectionStyle, snapStyle, config,
-            handlePositions, handleResizeStart,
-            handleCanvasClick, currentGrid
+            model, config, canvasWidth, canvasHeight, screenOutput, scrollContainer,
+            // toolbar:
+            copyToClipboard, downloadFile, deleteSelectedShape, addShape,
+            // shapes:
+            displayShapes, getShapeIcon, handleDragStart, handleDragOver, handleDrop, dragIndex,
+            // editor:
+            selectedNodeId, selectedNode, selectionStyle, snapStyle, handlePositions, handleResizeStart, handleCanvasClick,
+            // other:
+            currentGrid
         };
     }
 }).mount('#app');
