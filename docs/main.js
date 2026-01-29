@@ -220,12 +220,12 @@ class Shape {
 class Rect extends Shape {
 
     static editables = [
-        new Editable("Name", "name", "text"),
-        new Editable("Style", "style", "select", ['normal', 'bold', 'double']),
-        new Editable("Transparent", "transparent", "checkbox"),
-        new Editable("Horizontal Align", "alignX", "select", ['left', 'center', 'right']),
-        new Editable("Vertical Align", "alignY", "select", ['top', 'center', 'bottom']),
-        new Editable("Text", "text", "textarea"),
+        new Editable('Name', 'name', 'text'),
+        new Editable('Style', 'style', 'select', ['none', 'normal', 'bold', 'double']),
+        new Editable('Transparent', 'transparent', 'checkbox'),
+        new Editable('Horizontal Align', 'alignX', 'select', ['left', 'center', 'right']),
+        new Editable('Vertical Align', 'alignY', 'select', ['top', 'center', 'bottom']),
+        new Editable('Text', 'text', 'textarea'),
     ];
 
     constructor(x, y, w, h, props = {}) {
@@ -235,7 +235,7 @@ class Rect extends Shape {
 
         // 默认属性:
         this.transparent = false;
-        this.text = "";
+        this.text = '';
         this.alignX = 'center'; // 'left', 'center', 'right'
         this.alignY = 'center'; // 'top', 'center', 'bottom'
         this.wrap = true;       // 是否自动折行
@@ -388,10 +388,10 @@ class Rect extends Shape {
 class Line extends Shape {
 
     static editables = [
-        new Editable("Name", "name", "text"),
-        new Editable("Style", "style", "select", ['normal', 'bold', 'double']),
-        new Editable("Start Point", "startStyle", "select", ["normal", "arrow"]),
-        new Editable("End Point", "endStyle", "select", ["normal", "arrow"])
+        new Editable('Name', 'name', 'text'),
+        new Editable('Style', 'style', 'select', ['normal', 'bold', 'double']),
+        new Editable('Start Point', 'startStyle', 'select', ['normal', 'arrow']),
+        new Editable('End Point', 'endStyle', 'select', ['normal', 'arrow'])
     ];
 
     constructor(x1, y1, x2, y2, props) {
@@ -780,13 +780,13 @@ class Line extends Shape {
 }
 
 function initModel(model) {
-    let r1 = new Rect(3, 1, 26, 7, { text: "Welcome to ASCII Draw!", name: "Welcome" });
-    let r2 = new Rect(41, 1, 23, 7, { text: "Free & Open Source!\nby Crypto Michael\nversion: 1.0" });
-    let l1 = new Line(28, 4, 41, 4, { name: "Connector", startBinding: { nodeId: r1.id, side: "right" }, endBinding: { nodeId: r2.id, side: "left" }, endStyle: "arrow" });
+    let r1 = new Rect(3, 1, 26, 7, { text: 'Welcome to ASCII Draw!', name: 'Welcome' });
+    let r2 = new Rect(41, 1, 23, 7, { text: 'Free & Open Source!\nby Crypto Michael\nversion: 1.0' });
+    let l1 = new Line(28, 4, 41, 4, { name: 'Connector', startBinding: { nodeId: r1.id, side: 'right' }, endBinding: { nodeId: r2.id, side: 'left' }, endStyle: 'arrow' });
     model.shapes.push(
         r1, r2, l1,
         new Line(3, 10, 63, 10),
-        new Rect(3, 13, 61, 3, { alignX: "left", style: "none", text: "ASCII Draw is OPEN SOURCE!\nAuthor: Crypto Michael\nGitHub: https://github.com/michaelliao/asciidraw.puppylab.org" })
+        new Rect(3, 13, 61, 3, { alignX: 'left', style: 'none', text: 'ASCII Draw is OPEN SOURCE!\nAuthor: Crypto Michael\nGitHub: https://github.com/michaelliao/asciidraw.puppylab.org' })
     );
 }
 
@@ -921,28 +921,28 @@ createApp({
             }
 
             if (!hasContent) {
-                console.warn("Canvas is empty, nothing to copy.");
+                console.warn('Canvas is empty, nothing to copy.');
                 return;
             }
 
             // 3. 裁剪并构建字符串
-            let output = "";
+            let output = '';
             for (let y = minY; y <= maxY; y++) {
-                let rowStr = "";
+                let rowStr = '';
                 for (let x = minX; x <= maxX; x++) {
-                    rowStr += buffer[y][x] || " ";
+                    rowStr += buffer[y][x] || ' ';
                 }
                 // trimEnd 移除行尾冗余空格，但在最后一行不加换行符
-                output += rowStr.trimEnd() + (y === maxY ? "" : "\n");
+                output += rowStr.trimEnd() + (y === maxY ? '' : '\n');
             }
 
             // 4. 调用剪贴板 API
             try {
                 await navigator.clipboard.writeText(output);
                 // 这里可以添加一个反馈效果
-                console.log("Copied to clipboard with cropping!");
+                console.log('Copied to clipboard with cropping!');
             } catch (err) {
-                console.error("Failed to copy to clipboard:", err);
+                console.error('Failed to copy to clipboard:', err);
             }
         };
 

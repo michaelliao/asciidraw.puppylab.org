@@ -306,21 +306,42 @@
                 </div>
             </div>
         </section>
-
         <aside
             class="w-[200px] flex-none border-l border-gray-700 bg-[#1e1e1e] flex flex-col scrollbar-styled overflow-auto">
             <div
                 class="sticky top-0 p-2 text-[10px] uppercase tracking-wider text-gray-500 font-bold bg-[#1e1e1e] border-b border-gray-800 z-10">
-                Props</div>
-            <div class="p-2 space-y-4 h-[1000px]">
-                <div>
-                    <label class="block text-[10px] text-gray-500 mb-1">X Pos</label>
-                    <input type="text" value="20" class="w-full bg-[#333] border border-gray-600 rounded px-1 text-xs">
+                Props
+            </div>
+
+            <div v-if="selectedNode" class="p-4 space-y-4">
+                <!-- 属性编辑区 -->
+                <div v-for="item in selectedNode.getEditables()" :key="item.propName">
+                    <label class="block text-[10px] text-gray-500 mb-1 uppercase font-semibold">{{ item.name }}</label>
+
+                    <input v-if="item.type === 'text'" type="text" maxlength="50" v-model="selectedNode[item.propName]"
+                        class="w-full bg-[#333] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none">
+
+                    <textarea v-else-if="item.type === 'textarea'" v-model="selectedNode[item.propName]" rows="5"
+                        class="w-full bg-[#333] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none resize-none"></textarea>
+
+                    <div v-else-if="item.type === 'checkbox'" class="flex items-center">
+                        <input type="checkbox" v-model="selectedNode[item.propName]"
+                            class="w-4 h-4 accent-blue-600 cursor-pointer">
+                        <span class="ml-2 text-xs text-gray-400">Enabled</span>
+                    </div>
+
+                    <select v-else-if="item.type === 'select'" v-model="selectedNode[item.propName]"
+                        class="w-full bg-[#333] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none cursor-pointer">
+                        <option v-for="opt in item.enums" :key="opt" :value="opt">
+                            {{ opt.charAt(0).toUpperCase() + opt.slice(1) }}
+                        </option>
+                    </select>
                 </div>
-                <div>
-                    <label class="block text-[10px] text-gray-500 mb-1">Y Pos</label>
-                    <input type="text" value="10" class="w-full bg-[#333] border border-gray-600 rounded px-1 text-xs">
-                </div>
+            </div>
+
+            <div v-else
+                class="flex flex-col items-center justify-center h-full text-gray-600 italic text-xs p-10 text-center">
+                Select a shape on the canvas to edit its properties
             </div>
         </aside>
     </main>
