@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unnamed - Ascii Draw</title>
+    <title>ASCII Draw</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1"></script>
     <script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
     <script src="https://unpkg.com/vue@3.5.27/dist/vue.global.js"></script>
     <style>
@@ -199,68 +199,72 @@
             cursor: move;
         }
     </style>
+    <style type="text/tailwindcss">
+        @layer components {
+            .toolbar-button {
+                @apply px-3 py-1 cursor-pointer rounded text-sm transition bg-zinc-700 hover:bg-zinc-600 text-gray-300 hover:text-gray-100;
+            }
+    
+            .toolbar-button:disabled {
+                @apply cursor-default bg-zinc-700 text-gray-600;
+            }
 
+            .toolbar-seperator {
+                @apply h-6 w-px bg-gray-600 mx-2;
+            }
+        }
+    </style>
 </head>
 
 <body id="app" class="h-full w-full bg-[#1a1a1a] text-gray-300 flex flex-col">
 
     <header class="w-full h-auto flex-none border-b border-gray-700 bg-[#252525] p-2 overflow-hidden whitespace-nowrap">
         <div class="flex items-center gap-2">
-            <!-- <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Open File">
+            <button title="Open File" class="toolbar-button" @click="openLocalFile">
                 <i data-lucide="folder-open" class="w-5 h-5"></i>
-            </button> -->
-            <!-- <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Save File">
-                <i data-lucide="save" class="w-5 h-5"></i>
-            </button> -->
-            <button title="Download File" @click="downloadFile"
-                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
-                <i data-lucide="download" class="w-5 h-5"></i>
             </button>
-            <button title="Copy to Clipboard" @click="copyToClipboard"
-                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button title="Save File" class="toolbar-button" @click="saveLocalFile" :disabled="!history.isDirty()">
+                <i data-lucide="save" class="w-5 h-5"></i>
+            </button>
+            <button title="Copy to Clipboard" class="toolbar-button bg-blue-600 hover:bg-blue-500"
+                @click="copyToClipboard">
                 <i data-lucide="clipboard-check" class="w-5 h-5"></i>
             </button>
-            <div class="h-6 w-px bg-gray-600 mx-2"></div>
-            <!-- <button class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition"
-                title="Select">
-                <i data-lucide="mouse-pointer" class="w-5 h-5"></i>
-            </button> -->
-            <button title="Rect" @click="addShape('rect', {})"
-                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+
+            <div class="toolbar-seperator"></div>
+
+            <button title="Rect" class="toolbar-button" @click="addShape('rect', {})">
                 <i data-lucide="square" class="w-5 h-5"></i>
             </button>
-            <button title="Line" @click="addShape('line', {})"
-                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button title="Line" class="toolbar-button" @click="addShape('line', {})">
                 <i data-lucide="minus" class="w-5 h-5"></i>
             </button>
-            <button title="Arrow" @click="addShape('line', {endStyle: 'arrow'})"
-                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button title="Arrow" class="toolbar-button" @click="addShape('line', {endStyle: 'arrow'})">
                 <i data-lucide="arrow-up-right" class="w-5 h-5"></i>
             </button>
-            <button title="Text" @click="addShape('rect', {transparent:true, text:'Text Box', style:'none'})"
-                class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">
+            <button title="Text" class="toolbar-button"
+                @click="addShape('rect', {transparent:true, text:'Text Box', style:'none'})">
                 <i data-lucide="type" class="w-5 h-5"></i>
             </button>
-            <div class="h-6 w-px bg-gray-600 mx-2"></div>
-            <button title="Delete" @click="deleteSelectedShape" :disabled="!selectedNodeId" :class="[
-                'px-3 py-1 rounded text-sm transition flex items-center justify-center',
-                selectedNodeId 
-                    ? 'bg-red-600/80 hover:bg-red-500 text-white' 
-                    : 'bg-[#333] text-gray-600 opacity-50'
-                ]">
+
+            <div class="toolbar-seperator"></div>
+
+            <button title="Delete" @click="deleteSelectedShape" :disabled="!selectedNodeId"
+                :class="['toolbar-button', selectedNodeId ? 'bg-red-600 hover:bg-red-500' : '']">
                 <i data-lucide="trash-2" class="w-5 h-5"></i>
             </button>
-            <button title="Undo" @click="handleUndo" :disabled="!canUndo"
-                :class="['px-3 py-1 bg-[#333] rounded text-sm transition', canUndo ? 'hover:bg-[#444] text-gray-300' : 'text-gray-600 opacity-50']">
+            <button title="Undo" class="toolbar-button" @click="handleUndo" :disabled="!canUndo">
                 <i data-lucide="undo-2" class="w-5 h-5"></i>
             </button>
-            <button title="Redo" @click="handleRedo" :disabled="!canRedo"
-                :class="['px-3 py-1 bg-[#333] rounded text-sm transition', canRedo ? 'hover:bg-[#444] text-gray-300' : 'text-gray-600 opacity-50']">
+            <button title="Redo" class="toolbar-button" @click="handleRedo" :disabled="!canRedo">
                 <i data-lucide="redo-2" class="w-5 h-5"></i>
             </button>
-            <div class="h-6 w-px bg-gray-600 mx-2"></div>
-            <!-- <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">Settings</button> -->
-            <span class="text-gray-500 text-xs mx-2">Unnamed - ASCII Draw v1.0</span>
+
+            <div class="toolbar-seperator"></div>
+
+            <span :class="['transition-colors', history.isDirty() ? 'text-gray-300' : 'text-gray-500']">
+                {{ fileName }}{{ history.isDirty() ? '*' : '' }}
+            </span>
         </div>
     </header>
 
@@ -309,7 +313,7 @@
             </div>
         </section>
         <aside
-            class="w-[200px] flex-none border-l border-gray-700 bg-[#1e1e1e] flex flex-col scrollbar-styled overflow-auto">
+            class="w-[250px] flex-none border-l border-gray-700 bg-[#1e1e1e] flex flex-col scrollbar-styled overflow-auto">
             <div
                 class="sticky top-0 p-2 text-[10px] uppercase tracking-wider text-gray-500 font-bold bg-[#1e1e1e] border-b border-gray-800 z-10">
                 Props
@@ -324,7 +328,7 @@
                         @focus="history.save()" @change="history.save()"
                         class="w-full bg-[#333] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none">
 
-                    <textarea v-else-if="item.type === 'textarea'" rows="5" v-model="selectedNode[item.propName]"
+                    <textarea v-else-if="item.type === 'textarea'" rows="7" v-model="selectedNode[item.propName]"
                         @focus="history.save()" @change="history.save()"
                         class="w-full bg-[#333] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none resize-none"></textarea>
 
@@ -358,7 +362,7 @@
                 <span>Selection: {{ selectedNode ? selectedNode.toString() : 'None' }}</span>
             </div>
             <div class="flex-none ml-4 font-mono">
-                <span>Grid: {{ currentGrid.x }}, {{ currentGrid.y }}</span> | ASCII Mode | Saved at 2026-01-24 20:15:32
+                <span>Grid: {{ currentGrid.x }}, {{ currentGrid.y }}</span> | ASCII Mode | <a target="_blank" href="https://github.com/michaelliao/asciidraw.puppylab.org" class="text-blue-400">GitHub</a>
             </div>
         </div>
     </footer>

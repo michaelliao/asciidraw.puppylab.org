@@ -797,16 +797,20 @@ class HistoryManager {
 
         // 核心：记录最后一次保存时的快照字符串
         this.lastSavedSnapshot = this._takeSnapshot();
+
+        this.changeTicket = Vue.ref(0); // 变更凭证
     }
 
     // 判断当前状态是否与上次保存的状态不一致
     isDirty() {
+        const unused = this.changeTicket.value;
         return this._takeSnapshot() !== this.lastSavedSnapshot;
     }
 
     // 当用户点击“下载”或“保存”成功后调用此方法
     markClean() {
         this.lastSavedSnapshot = this._takeSnapshot();
+        this.changeTicket.value++;
         console.log("Model marked as clean.");
     }
 
@@ -869,13 +873,13 @@ class HistoryManager {
 }
 
 function initModel(model) {
-    let r1 = new Rect(3, 1, 26, 7, { text: 'Welcome to ASCII Draw!', name: 'Welcome' });
-    let r2 = new Rect(41, 1, 23, 7, { text: 'Free & Open Source!\nby Crypto Michael\nversion: 1.0' });
+    let r1 = new Rect(3, 1, 26, 7, { name: 'Welcome', text: 'Welcome to ASCII Draw!' });
+    let r2 = new Rect(41, 1, 23, 7, { name: "OpenSource", text: 'Free & Open Source!\nby Crypto Michael\nversion: 1.0' });
     let l1 = new Line(28, 4, 41, 4, { name: 'Connector', startBinding: { nodeId: r1.id, side: 'right' }, endBinding: { nodeId: r2.id, side: 'left' }, endStyle: 'arrow' });
     model.shapes.push(
         r1, r2, l1,
-        new Line(3, 10, 63, 10),
-        new Rect(3, 13, 61, 3, { alignX: 'left', style: 'none', text: 'ASCII Draw is OPEN SOURCE!\nAuthor: Crypto Michael\nGitHub: https://github.com/michaelliao/asciidraw.puppylab.org' })
+        new Line(3, 10, 63, 10, { name: "separator" }),
+        new Rect(3, 13, 61, 3, { name: "Info", transparent: true, alignX: 'left', style: 'none', text: 'ASCII Draw is OPEN SOURCE!\nAuthor: Crypto Michael\nGitHub: https://github.com/michaelliao/asciidraw.puppylab.org' })
     );
 }
 
@@ -1141,44 +1145,6 @@ createApp({
             return '';
         };
 
-        const downloadFile = () => {
-            // 1. 构造 JSON 数据结构
-            const data = {
-                version: 1,
-                // 调用每个 shape 的 toJSON() 方法
-                shapes: model.shapes.map(shape => shape.toJSON())
-            };
-
-            // 2. 将对象转换为 JSON 字符串 (包含 2 空格缩进，方便人类阅读)
-            const jsonString = JSON.stringify(data, null, 2);
-
-            console.log(">>> download >>>");
-            console.log(jsonString);
-
-            // 3. 创建 Blob 对象，指定类型为 json
-            const blob = new Blob([jsonString], { type: "application/json" });
-
-            // 4. 创建一个临时的下载链接
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-
-            link.href = url;
-            link.download = "unamed.asciidraw"; // 指定下载文件名
-
-            // 5. 触发点击并移除临时对象
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            // 释放 URL 对象，节省内存
-            URL.revokeObjectURL(url);
-
-            console.log("File exported as unamed.asciidraw");
-
-            // 成功后，标记为干净
-            history.markClean();
-        };
-
         const handlePositions = computed(() => {
             const n = selectedNode.value;
             if (!n || n.type !== 'Line') return [];
@@ -1335,6 +1301,99 @@ createApp({
             selectedNodeId.value = hit ? hit.id : null;
         };
 
+        const fileHandle = ref(null); // 记录本地文件句柄
+        const fileName = ref('Unnamed.asciidraw'); // 文件名
+
+        // 辅助方法：更新文件名
+        const updateFileInfo = (handle) => {
+            if (handle) {
+                fileHandle.value = handle;
+                fileName.value = handle.name;
+            } else {
+                fileHandle.value = null;
+                fileName.value = 'Unnamed.asciidraw';
+            }
+            document.title = fileName.value + " - ASCII Draw";
+        };
+
+        const openLocalFile = async () => {
+            if (history.isDirty()) {
+                if (!confirm("Discard changes?")) {
+                    return;
+                }
+            }
+            try {
+                // 1. 弹出原生文件选择对话框
+                const [handle] = await window.showOpenFilePicker({
+                    types: [{
+                        description: 'ASCII Draw Files',
+                        accept: { 'application/json': ['.asciidraw', '.json'] }
+                    }],
+                    multiple: false
+                });
+
+
+                // 2. 读取文件内容
+                const file = await handle.getFile();
+                const content = await file.text();
+                const shapesData = JSON.parse(content);
+
+                // 3. 恢复模型数据
+                // 注意：使用你 HistoryManager 里定义的 factory 恢复实例
+                const newShapes = shapesData.map(item => history.factory(item));
+                model.shapes.splice(0, model.shapes.length, ...newShapes);
+
+                updateFileInfo(handle);
+
+                // 4. 状态同步
+                history.save();      // 存入撤销栈
+                history.markClean(); // 既然是刚打开的，标记为“干净”
+
+                console.log(`File loaded: ${file.name}`);
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Failed to open file:', err);
+                }
+            }
+        };
+
+        const saveLocalFile = async () => {
+            // 如果没有打开过文件，则执行“另存为”逻辑
+            if (!fileHandle.value) {
+                return saveFileAs();
+            }
+
+            try {
+                const content = JSON.stringify(model.shapes.map(s => s.toJSON()), null, 2);
+
+                // 创建写入流
+                const writable = await fileHandle.value.createWritable();
+                await writable.write(content);
+                await writable.close();
+
+                history.markClean(); // 保存成功，标记为干净
+                console.log('File saved successfully.');
+            } catch (err) {
+                console.error('Save failed:', err);
+            }
+        };
+
+        const saveFileAs = async () => {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: fileName.value,
+                    types: [{
+                        description: 'ASCII Draw Files',
+                        accept: { 'application/json': ['.asciidraw'] }
+                    }]
+                });
+                updateFileInfo(handle); // 保存成功后，文件名可能从 unnamed 变成了具体名称
+                await saveLocalFile();
+            } catch (err) {
+                if (err.name !== 'AbortError') console.error(err);
+            }
+        };
+
         const handleBeforeUnload = (e) => {
             if (history.isDirty()) {
                 // 现代浏览器中，自定义文本通常不会显示，
@@ -1371,6 +1430,8 @@ createApp({
 
             lucide.createIcons();
 
+            updateFileInfo(null);
+
             window.addEventListener('beforeunload', handleBeforeUnload);
         });
 
@@ -1380,8 +1441,10 @@ createApp({
 
         return {
             model, config, canvasWidth, canvasHeight, screenOutput, scrollContainer,
+            // open/save:
+            openLocalFile, saveLocalFile, fileName,
             // toolbar:
-            copyToClipboard, downloadFile, deleteSelectedShape, addShape,
+            copyToClipboard, deleteSelectedShape, addShape,
             // undo/redo:
             canUndo, canRedo, handleUndo, handleRedo, history,
             // shapes:
