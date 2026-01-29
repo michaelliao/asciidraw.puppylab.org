@@ -250,12 +250,14 @@
                 ]">
                 <i data-lucide="trash-2" class="w-5 h-5"></i>
             </button>
-            <!-- <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Undo">
+            <button title="Undo" @click="handleUndo" :disabled="!canUndo"
+                :class="['px-3 py-1 bg-[#333] rounded text-sm transition', canUndo ? 'hover:bg-[#444] text-gray-300' : 'text-gray-600 opacity-50']">
                 <i data-lucide="undo-2" class="w-5 h-5"></i>
-            </button> -->
-            <!-- <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition" title="Redo">
+            </button>
+            <button title="Redo" @click="handleRedo" :disabled="!canRedo"
+                :class="['px-3 py-1 bg-[#333] rounded text-sm transition', canRedo ? 'hover:bg-[#444] text-gray-300' : 'text-gray-600 opacity-50']">
                 <i data-lucide="redo-2" class="w-5 h-5"></i>
-            </button> -->
+            </button>
             <div class="h-6 w-px bg-gray-600 mx-2"></div>
             <!-- <button class="px-3 py-1 bg-[#333] hover:bg-[#444] rounded text-sm transition">Settings</button> -->
             <span class="text-gray-500 text-xs mx-2">Unnamed - ASCII Draw v1.0</span>
@@ -319,18 +321,21 @@
                     <label class="block text-[10px] text-gray-500 mb-1 uppercase font-semibold">{{ item.name }}</label>
 
                     <input v-if="item.type === 'text'" type="text" maxlength="50" v-model="selectedNode[item.propName]"
+                        @focus="history.save()" @change="history.save()"
                         class="w-full bg-[#333] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none">
 
-                    <textarea v-else-if="item.type === 'textarea'" v-model="selectedNode[item.propName]" rows="5"
+                    <textarea v-else-if="item.type === 'textarea'" rows="5" v-model="selectedNode[item.propName]"
+                        @focus="history.save()" @change="history.save()"
                         class="w-full bg-[#333] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none resize-none"></textarea>
 
-                    <div v-else-if="item.type === 'checkbox'" class="flex items-center">
+                    <div v-else-if="item.type === 'checkbox'" @click="history.save()" class="flex items-center">
                         <input type="checkbox" v-model="selectedNode[item.propName]"
                             class="w-4 h-4 accent-blue-600 cursor-pointer">
                         <span class="ml-2 text-xs text-gray-400">Enabled</span>
                     </div>
 
                     <select v-else-if="item.type === 'select'" v-model="selectedNode[item.propName]"
+                        @mousedown="history.save()" @change="history.save()"
                         class="w-full bg-[#333] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none cursor-pointer">
                         <option v-for="opt in item.enums" :key="opt" :value="opt">
                             {{ opt.charAt(0).toUpperCase() + opt.slice(1) }}

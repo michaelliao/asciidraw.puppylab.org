@@ -248,7 +248,7 @@ class Rect extends Shape {
         return Rect.editables;
     }
 
-    toString(){
+    toString() {
         return `Rect: ${this.w} x ${this.h} at (${this.x}, ${this.y})`;
     }
 
@@ -398,8 +398,8 @@ class Line extends Shape {
         new Editable('End Point', 'endStyle', 'select', ['normal', 'arrow'])
     ];
 
-    constructor(x1, y1, x2, y2, props) {
-        super('Line', x1, y1);
+    constructor(x, y, x2, y2, props) {
+        super('Line', x, y);
         this.x2 = x2;
         this.y2 = y2;
         this.startBinding = { nodeId: null, side: null };
@@ -416,7 +416,7 @@ class Line extends Shape {
         return Line.editables;
     }
 
-    toString(){
+    toString() {
         return `Line: (${this.x}, ${this.y}) - (${this.x2}, ${this.y2})`;
     }
 
@@ -787,6 +787,73 @@ class Line extends Shape {
     }
 }
 
+class HistoryManager {
+    constructor(model, factory) {
+        this.model = model;
+        this.factory = factory; // 用于实例化 shapes 的工厂函数
+        this.undoStack = Vue.reactive([]);
+        this.redoStack = Vue.reactive([]);
+        this.maxSteps = 50;
+    }
+
+    // 获取当前状态快照
+    _takeSnapshot() {
+        return JSON.stringify(this.model.shapes.map(s => s.toJSON()));
+    }
+
+    // 执行保存：在任何修改动作“开始前”调用
+    save() {
+        const snapshot = this._takeSnapshot();
+
+        // 只有当新快照与栈顶不同时才存入，避免冗余
+        if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === snapshot) {
+            return;
+        }
+
+        this.undoStack.push(snapshot);
+        if (this.undoStack.length > this.maxSteps) {
+            this.undoStack.shift();
+        }
+
+        // 执行了新动作，必须清空重做栈
+        if (this.redoStack.length > 0) {
+            this.redoStack.splice(0, this.redoStack.length);
+        }
+    }
+
+    undo() {
+        if (this.undoStack.length === 0) return;
+
+        // 1. 将当前状态推入 redoStack
+        this.redoStack.push(this._takeSnapshot());
+
+        // 2. 取出最近的快照并应用
+        const prev = this.undoStack.pop();
+        this._restore(prev);
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+
+        // 1. 将当前状态推入 undoStack
+        this.undoStack.push(this._takeSnapshot());
+
+        // 2. 取出 redo 栈顶快照并应用
+        const next = this.redoStack.pop();
+        this._restore(next);
+    }
+
+    _restore(snapshot) {
+        console.log(`undo:restore`);
+        const data = JSON.parse(snapshot);
+        const newShapes = data.map(item => this.factory(item));
+
+        // 关键点：不要使用 this.model.shapes = newShapes;
+        // 而是清空原数组并推入新元素，这样能确保 Vue 监听到数组的变化
+        this.model.shapes.splice(0, this.model.shapes.length, ...newShapes);
+    }
+}
+
 function initModel(model) {
     let r1 = new Rect(3, 1, 26, 7, { text: 'Welcome to ASCII Draw!', name: 'Welcome' });
     let r2 = new Rect(41, 1, 23, 7, { text: 'Free & Open Source!\nby Crypto Michael\nversion: 1.0' });
@@ -810,8 +877,14 @@ createApp({
         const currentGrid = ref({ x: 0, y: 0 });
 
         const model = new Model(config);
-
         initModel(model);
+
+        const history = new HistoryManager(model, (item) => {
+            // 简易工厂逻辑
+            if (item.type === 'Rect') return new Rect(item.x, item.y, item.w, item.h, item);
+            if (item.type === 'Line') return new Line(item.x, item.y, item.x2, item.y2, item);
+            throw `Unsupported type: ${item.type}`;
+        });
 
         const scrollContainer = ref(null);
 
@@ -890,6 +963,27 @@ createApp({
             };
         });
 
+        const canUndo = computed(() => {
+            // 依赖于 model.shapes 以便在撤销动作后重新计算
+            // (实际上 history 本身不是响应式的，所以我们需要在 undo/redo 后手动触发生命周期)
+            return history.undoStack.length > 0;
+        });
+
+        const canRedo = computed(() => {
+            return history.redoStack.length > 0;
+        });
+
+        const handleUndo = () => {
+            history.undo();
+            // 撤销后，可能需要手动重设选中项，防止引用已销毁的旧对象
+            selectedNodeId.value = null;
+        };
+
+        const handleRedo = () => {
+            history.redo();
+            selectedNodeId.value = null;
+        };
+
         const renderToBuffer = () => {
             const buffer = createBuffer();
             const ctx = new Context(buffer, model);
@@ -966,6 +1060,8 @@ createApp({
             // 计算相对于画布原点的像素中点，然后转为网格坐标
             const centerX = Math.floor((scrollLeft + viewW / 2) / config.charW);
             const centerY = Math.floor((scrollTop + viewH / 2) / config.charH);
+
+            history.save();
 
             let newShape = null;
 
@@ -1091,6 +1187,8 @@ createApp({
 
             const node = selectedNode.value;
             if (!node) return;
+
+            history.save();
 
             // 记录初始鼠标位置
             const startX = e.clientX;
@@ -1250,6 +1348,8 @@ createApp({
             model, config, canvasWidth, canvasHeight, screenOutput, scrollContainer,
             // toolbar:
             copyToClipboard, downloadFile, deleteSelectedShape, addShape,
+            // undo/redo:
+            canUndo, canRedo, handleUndo, handleRedo, history,
             // shapes:
             displayShapes, getShapeIcon, handleDragStart, handleDragOver, handleDrop, dragIndex,
             // editor:
