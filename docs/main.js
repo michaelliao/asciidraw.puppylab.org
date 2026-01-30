@@ -58,7 +58,7 @@ function wrapByDisplayWidth(str, maxWidth) {
     const lines = [];
     let currentLine = '';
     let currentWidth = 0;
-    
+
     for (const char of str) {
         const charWidth = isFullWidth(char) ? 2 : 1;
         if (currentWidth + charWidth > maxWidth) {
@@ -443,7 +443,7 @@ class Rect extends Shape {
                 const char = line[c];
                 const col = this.x + startX + colOffset;
                 const charWidth = isFullWidth(char) ? 2 : 1;
-                
+
                 // 确保文字在矩形水平边界内
                 if (col < this.x + offset) {
                     colOffset += charWidth;
@@ -460,7 +460,7 @@ class Rect extends Shape {
                         buffer[row][col + 1] = '';
                     }
                 }
-                
+
                 colOffset += charWidth;
             }
         });
@@ -630,6 +630,7 @@ class Line extends Shape {
         }
     }
 
+    // 计算从(x1, y1)到(x2, y2)的路径，startSide和endSide分别指定吸附边的位置，null为未吸附：
     _calculatePath(x1, y1, x2, y2, startSide, endSide) {
         console.log(`_calculatePath: (${x1},${y1}, ${startSide}) to (${x2},${y2}, ${endSide})`);
         let path = [{ x: x1, y: y1 }];
@@ -960,6 +961,26 @@ function initModel(model) {
         new Line(3, 10, 63, 10, { name: "separator" }),
         new Rect(3, 13, 61, 3, { name: "Info", transparent: true, alignX: 'left', style: 'none', text: 'ASCII Draw is OPEN SOURCE!\nAuthor: Crypto Michael\nGitHub: https://github.com/michaelliao/asciidraw.puppylab.org' })
     );
+}
+
+function run_test() {
+    const line = new Line(0, 0, 0, 0, {});
+    const testCalculatePath = (x1, y1, x2, y2, startSide, endSide, ...expectedPoints) => {
+        const s = `test _calculatePath(${x1}, ${y1}, ${x2}, ${y2}, ${startSide}, ${endSide})`;
+        let pt = line._calculatePath(x1, y1, x2, y2, startSide, endSide).map(xy => [xy.x, xy.y]);
+        let actual = JSON.stringify(pt);
+        let expected = JSON.stringify(expectedPoints);
+        if (expected !== actual) {
+            console.error(`${s} = ${actual}: failed: expected ${expected}.`);
+            return false;
+        }
+        console.log(`${s} = ${actual}: ok.`);
+        return true;
+    };
+    console.log("BEGIN TEST >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+    testCalculatePath(4, 4, 8, 8, 'right', 'left', [4, 4], [6, 4], [6, 8], [8, 8]);
+    // TODO: add more tests
+    console.log("END TEST >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 }
 
 createApp({
@@ -1516,6 +1537,11 @@ createApp({
             updateFileInfo(null);
 
             window.addEventListener('beforeunload', handleBeforeUnload);
+
+            // 本地运行时执行test:
+            if (window.location.hostname === 'localhost') {
+                run_test();
+            }
         });
 
         onUnmounted(() => {
