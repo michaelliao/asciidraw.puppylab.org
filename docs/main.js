@@ -17,6 +17,63 @@ const ARROW_CHARS = {
     right: '◀'
 };
 
+// 判断字符是否为全角字符（中文、日文、韩文等）
+function isFullWidth(char) {
+    const code = char.charCodeAt(0);
+    return (
+        (code >= 0x4E00 && code <= 0x9FFF) ||   // CJK 统一汉字
+        (code >= 0x3400 && code <= 0x4DBF) ||   // CJK 扩展 A
+        (code >= 0x3000 && code <= 0x303F) ||   // CJK 标点符号
+        (code >= 0xFF00 && code <= 0xFFEF) ||   // 全角ASCII、半角片假名
+        (code >= 0xAC00 && code <= 0xD7AF) ||   // 韩文音节
+        (code >= 0x3040 && code <= 0x309F) ||   // 平假名
+        (code >= 0x30A0 && code <= 0x30FF)      // 片假名
+    );
+}
+
+// 计算字符串的显示宽度（全角字符=2，半角字符=1）
+function getDisplayWidth(str) {
+    let width = 0;
+    for (const char of str) {
+        width += isFullWidth(char) ? 2 : 1;
+    }
+    return width;
+}
+
+// 按显示宽度截取字符串
+function sliceByDisplayWidth(str, maxWidth) {
+    let result = '';
+    let currentWidth = 0;
+    for (const char of str) {
+        const charWidth = isFullWidth(char) ? 2 : 1;
+        if (currentWidth + charWidth > maxWidth) break;
+        result += char;
+        currentWidth += charWidth;
+    }
+    return result;
+}
+
+// 按显示宽度进行自动换行
+function wrapByDisplayWidth(str, maxWidth) {
+    const lines = [];
+    let currentLine = '';
+    let currentWidth = 0;
+    
+    for (const char of str) {
+        const charWidth = isFullWidth(char) ? 2 : 1;
+        if (currentWidth + charWidth > maxWidth) {
+            lines.push(currentLine);
+            currentLine = char;
+            currentWidth = charWidth;
+        } else {
+            currentLine += char;
+            currentWidth += charWidth;
+        }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+}
+
 const DIR_MAP = {
     // 单线 (Weight 1)
     '─': { t: 0, b: 0, l: 1, r: 1 }, '│': { t: 1, b: 1, l: 0, r: 0 },
@@ -273,6 +330,7 @@ class Rect extends Shape {
     }
 
     // 在 Rect 类中添加处理文本的方法
+    // 使用显示宽度正确处理中文字符（中文占2格，英文占1格）
     layoutText() {
         if (!this.text) return [];
         // 如果没有边框，填充为 0；否则为 2（左右或上下之和）
@@ -286,12 +344,14 @@ class Rect extends Shape {
         const rawSegments = this.text.split('\n');
 
         rawSegments.forEach(segment => {
-            if (!this.wrap || segment.length <= maxWidth) {
-                lines.push(segment.slice(0, maxWidth));
+            const segmentDisplayWidth = getDisplayWidth(segment);
+            if (!this.wrap || segmentDisplayWidth <= maxWidth) {
+                // 按显示宽度截取
+                lines.push(sliceByDisplayWidth(segment, maxWidth));
             } else {
-                for (let i = 0; i < segment.length; i += maxWidth) {
-                    lines.push(segment.slice(i, i + maxWidth));
-                }
+                // 按显示宽度自动换行
+                const wrappedLines = wrapByDisplayWidth(segment, maxWidth);
+                lines.push(...wrappedLines);
             }
         });
         return lines.slice(0, maxHeight);
@@ -368,21 +428,40 @@ class Rect extends Shape {
             if (row < this.y + offset || row >= this.y + offset + availableH) return;
 
             // 计算 X 轴起始位置 (相对于 this.x)
+            // 使用显示宽度来正确处理全角字符（中文占2格，英文占1格）
+            const lineDisplayWidth = getDisplayWidth(line);
             let startX = offset;
             if (this.alignX === 'center') {
-                startX = offset + Math.floor((availableW - line.length) / 2);
+                startX = offset + Math.floor((availableW - lineDisplayWidth) / 2);
             } else if (this.alignX === 'right') {
-                startX = offset + (availableW - line.length);
+                startX = offset + (availableW - lineDisplayWidth);
             }
 
+            // 逐字符绘制，全角字符占2个buffer位置
+            let colOffset = 0;
             for (let c = 0; c < line.length; c++) {
-                const col = this.x + startX + c;
+                const char = line[c];
+                const col = this.x + startX + colOffset;
+                const charWidth = isFullWidth(char) ? 2 : 1;
+                
                 // 确保文字在矩形水平边界内
-                if (col < this.x + offset || col >= this.x + offset + availableW) continue;
+                if (col < this.x + offset) {
+                    colOffset += charWidth;
+                    continue;
+                }
+                if (col + charWidth > this.x + offset + availableW) {
+                    break; // 超出右边界，停止绘制
+                }
 
                 if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
-                    buffer[row][col] = line[c];
+                    buffer[row][col] = char;
+                    // 全角字符占用2个buffer位置，第二个位置用空字符串占位
+                    if (charWidth === 2 && col + 1 < COLS) {
+                        buffer[row][col + 1] = '';
+                    }
                 }
+                
+                colOffset += charWidth;
             }
         });
     }
@@ -1050,7 +1129,11 @@ createApp({
             for (let y = minY; y <= maxY; y++) {
                 let rowStr = '';
                 for (let x = minX; x <= maxX; x++) {
-                    rowStr += buffer[y][x] || ' ';
+                    // 使用 ?? 而非 || 来正确处理空字符串占位符（全角字符的第二个位置）
+                    const char = buffer[y][x] ?? ' ';
+                    if (char !== '') {
+                        rowStr += char;
+                    }
                 }
                 // trimEnd 移除行尾冗余空格，但在最后一行不加换行符
                 output += rowStr.trimEnd() + (y === maxY ? '' : '\n');
@@ -1406,7 +1489,7 @@ createApp({
         onMounted(() => {
             // 精确测量逻辑
             const tester = document.createElement('span');
-            tester.style.fontFamily = "'maple-mono'";
+            tester.style.fontFamily = "'Maple Mono NF CN'";
             tester.style.fontSize = '16px';
             tester.style.position = 'absolute';
             tester.style.visibility = 'hidden';

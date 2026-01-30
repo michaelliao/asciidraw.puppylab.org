@@ -10,10 +10,7 @@
     <script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
     <script src="https://unpkg.com/vue@3.5.27/dist/vue.global.js"></script>
     <style>
-        @font-face {
-            font-family: "maple-mono";
-            src: url("MapleMono.woff2");
-        }
+        @import url("https://fontsapi.zeoseven.com/442/main/result.css");
 
         :root {
             --canvas-bg: #121212;
@@ -80,7 +77,8 @@
         }
 
         #ascii-container {
-            font-family: 'maple-mono';
+            font-family: "Maple Mono NF CN";
+            font-weight: normal;
             font-size: 16px;
             /* 目标字号 */
             line-height: 24px;
@@ -362,7 +360,8 @@
                 <span>Selection: {{ selectedNode ? selectedNode.toString() : 'None' }}</span>
             </div>
             <div class="flex-none ml-4 font-mono">
-                <span>Grid: {{ currentGrid.x }}, {{ currentGrid.y }}</span> | ASCII Mode | <a target="_blank" href="https://github.com/michaelliao/asciidraw.puppylab.org" class="text-blue-400">GitHub</a>
+                <span>Grid: {{ currentGrid.x }}, {{ currentGrid.y }}</span> | ASCII Mode | <a target="_blank"
+                    href="https://github.com/michaelliao/asciidraw.puppylab.org" class="text-blue-400">GitHub</a>
             </div>
         </div>
     </footer>
