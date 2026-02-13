@@ -1332,7 +1332,7 @@ createApp({
 
                     // 2. 探测吸附
                     let bestSnap = null;
-                    let minOffset = 1; // 探测半径：1个字符以内触发
+                    let minOffset = 2; // 探测半径：1个字符以内触发
 
                     model.shapes.forEach(s => {
                         if (s.type !== 'Rect') return;
@@ -1342,10 +1342,10 @@ createApp({
 
                         const { x, y, w, h } = s.getBounds();
                         const midPoints = [
-                            { x: x + Math.floor((w + 1) / 2), y: y, side: 'top' },
-                            { x: x + Math.floor((w + 1) / 2), y: y + h - 1, side: 'bottom' },
-                            { x: x, y: y + Math.floor((h + 1) / 2), side: 'left' },
-                            { x: x + w - 1, y: y + Math.floor((h + 1) / 2), side: 'right' }
+                            { x: x + Math.floor(w / 2), y: y, side: 'top' },
+                            { x: x + Math.floor(w / 2), y: y + h - 1, side: 'bottom' },
+                            { x: x, y: y + Math.floor(h / 2), side: 'left' },
+                            { x: x + w - 1, y: y + Math.floor(h / 2), side: 'right' }
                         ];
 
                         midPoints.forEach(p => {
